@@ -1,0 +1,14 @@
+/.env
+/.env.*
+!/.env.example
+/.venv/
+/config/browser_python.txt
+/config/browser_login.toml
+/runtime/
+/captures/
+/desktop/bin/
+/desktop/obj/
+__pycache__/
+.pytest_cache/
+*.har
+*.user

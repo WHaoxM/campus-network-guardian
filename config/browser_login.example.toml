@@ -1,0 +1,53 @@
+[browser]
+channel = "msedge"
+headless = true
+timeout_seconds = 22
+navigation_timeout_seconds = 50
+# Replace these three placeholders with the portal published by your network operator.
+entry_url = "http://portal.example.test/"
+portal_origin = "http://portal.example.test"
+allowed_origins = ["http://portal.example.test"]
+auth_path = "/eportal/index.jsp"
+success_path = "/eportal/success.jsp"
+login_path = "/eportal/InterFace.do"
+auth_query_keys = ["wlanuserip", "wlanacname", "ssid", "nasip", "mac", "t", "url"]
+metadata_paths = ["/eportal/InterFace.do", "/eportal/userV2.do"]
+metadata_methods = ["pageInfo", "getServices", "getOnlineUserInfo", "getErrorMsg", "portalAuthSuccessConfig"]
+diagnostic_paths = ["/eportal/redirectortosuccess.jsp"]
+http_relay_origins = []
+service_labels = ["宜宾移动校园宽带", "宜宾移动校园网", "宜宾移动校园网宽带", "宜宾移动"]
+service_value = "宜宾移动"
+credential_rejection_messages = ["用户名或密码错误", "账号或密码错误", "密码错误"]
+
+[browser.selectors]
+username = "#username"
+username_placeholder = "#username_tip"
+password = "#pwd[type='password']"
+password_placeholder = "#pwd_tip"
+service_open = "#serviceShowHideTop"
+service_options = "[id^='bch_service_'][onclick*='selectService'], #serviceShowHide [id^='bch_service_']"
+service_value = "#net_access_type"
+submit = "#loginLink"
+logout_open = "#toLogOut"
+logout_confirm = "#mabcolse-confirm #sure"
+interactive = "#isDisplayValidCode, #isNoOperatorPasswordFrameId, #isNoOperatorUserIdFrameId, input[autocomplete='one-time-code']"
+
+[local]
+wifi_ssid = "SUSE"
+credential_file = "../.env"
+runtime_dir = "../runtime/browser-login"
+
+[network]
+probe_timeout_seconds = 3
+verify_attempts = 4
+verify_delay_seconds = 2
+
+[[network.probes]]
+url = "https://detectportal.firefox.com/success.txt"
+status = 200
+body = "success"
+
+[[network.probes]]
+url = "https://www.gstatic.com/generate_204"
+status = 204
+body = ""

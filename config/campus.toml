@@ -1,0 +1,32 @@
+browser_config = "browser_login.toml"
+runtime_dir = "../runtime/campus"
+task_name = "CampusNetwork-Maintenance"
+python_path_file = "browser_python.txt"
+task_watchdog_minutes = 5
+
+[schedule]
+# Monday through Sunday; an end earlier than its start belongs to the next day.
+windows = ["07:00-23:00", "07:00-23:00", "07:00-23:00", "07:00-23:00", "07:00-01:00", "07:00-01:00", "07:00-23:00"]
+poll_seconds = 10
+failure_rounds = 3
+cooldown_seconds = 600
+backoff_seconds = [30, 60, 120, 240, 300]
+join_retry_seconds = 60
+
+[windows]
+netsh = "netsh.exe"
+powershell = "powershell.exe"
+
+[logging]
+max_bytes = 262144
+backups = 3
+monitor_tail = 20
+monitor_poll_seconds = 1
+monitor_repeat_seconds = 60
+
+# Each alias refers to two keys in the existing private .env. No actual
+# usernames or passwords belong here. Add further [[accounts]] blocks locally.
+[[accounts]]
+alias = "primary"
+username_key = "CAMPUS_USERNAME"
+password_key = "CAMPUS_PASSWORD"

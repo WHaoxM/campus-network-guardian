@@ -1,0 +1,11 @@
+{
+  "status_file": "../campus/desktop/status.json",
+  "profile_directory": "../desktop-profile",
+  "ui_origin": "https://campus-guardian.test",
+  "poll_ms": 1000,
+  "fresh_seconds": 25,
+  "working_seconds": 180,
+  "probe_fresh_seconds": 45,
+  "window_width": 960,
+  "window_height": 640
+}

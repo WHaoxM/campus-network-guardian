@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SUSE 校园网守护</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <main id="window" class="window" aria-label="校园网守护">
+    <header class="titlebar">
+      <span>校园网守护</span>
+      <div class="window-actions">
+        <button type="button" id="minimize" aria-label="最小化演示窗口"><span class="minus" aria-hidden="true"></span></button>
+        <button type="button" id="close" aria-label="收起演示窗口"><span class="cross" aria-hidden="true"></span></button>
+      </div>
+    </header>
+    <div class="tabs" role="tablist" aria-label="守护器页面">
+      <button type="button" id="tab-status" role="tab" aria-selected="true" aria-controls="panel-status">状态</button>
+      <button type="button" id="tab-logs" role="tab" aria-selected="false" aria-controls="panel-logs" tabindex="-1" hidden>日志</button>
+    </div>
+    <section id="panel-status" class="content status-page" role="tabpanel" aria-labelledby="tab-status">
+      <div class="overview">
+        <div class="connection">
+          <span class="online-dot" aria-hidden="true"></span>
+          <div>
+            <h1 id="connection-heading">尚未取得守护状态</h1>
+            <p id="last-checked" class="muted"></p>
+          </div>
+        </div>
+        <div class="guardian">
+          <h2>后台守护</h2>
+          <p id="guardian-state" class="muted">正在读取</p>
+        </div>
+      </div>
+      <div class="recovery">
+        <div aria-live="polite" class="recovery-labels">
+          <h2 id="recovery-heading">自动恢复</h2>
+          <p id="recovery-detail" class="muted"></p>
+        </div>
+        <button id="pause" type="button" class="outline" hidden>暂停 30 分钟</button>
+      </div>
+      <section class="recent" aria-labelledby="recent-heading">
+        <h2 id="recent-heading">最近事件</h2>
+        <ol id="recent-list" class="event-list"></ol>
+        <p id="recent-empty" class="log-hint muted" hidden>暂无重要事件</p>
+      </section>
+    </section>
+    <section id="panel-logs" class="content logs-page" role="tabpanel" aria-labelledby="tab-logs" hidden>
+      <div class="filters" role="group" aria-label="日志筛选">
+        <button type="button" data-filter="important" aria-pressed="true">重要</button>
+        <button type="button" data-filter="auth" aria-pressed="false">登录</button>
+        <button type="button" data-filter="wifi" aria-pressed="false">Wi-Fi</button>
+        <button type="button" data-filter="schedule" aria-pressed="false">时段</button>
+        <button type="button" data-filter="all" aria-pressed="false">全部</button>
+      </div>
+      <table class="log-table" aria-label="事件日志">
+        <thead><tr><th scope="col">时间</th><th scope="col">事件</th></tr></thead>
+        <tbody id="log-list"></tbody>
+      </table>
+      <p id="log-hint" class="log-hint muted" aria-live="polite"></p>
+    </section>
+  </main>
+  <button id="reopen" class="reopen outline" type="button" hidden>打开校园网守护</button>
+  <footer class="demo-note">交互演示 · 不改变当前网络</footer>
+</body>
+</html>

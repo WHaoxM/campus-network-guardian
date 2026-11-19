@@ -1,0 +1,40 @@
+{
+  "second_probe": "/second-online",
+  "accounts": [
+    ["first", "fixture-student", "fixture-pass"],
+    ["second", "fixture-second", "fixture-wrong"],
+    ["third", "fixture-third", "fixture-third-pass"]
+  ],
+  "steps": [
+    {"at":"2026-11-19T06:59:59+08:00","want":"outside_window"},
+    {"at":"2026-11-19T07:00:00+08:00","wifi":"other","want":"different_or_ambiguous_wifi"},
+    {"at":"2026-11-19T07:00:01+08:00","wifi":"none","want":"wifi_join_requested_fixture"},
+    {"at":"2026-11-19T07:00:10+08:00","want":"browser_login_verified","posts":1,"account":"first"},
+    {"at":"2026-11-19T07:00:20+08:00","lose_first_probe":true,"want":"online","posts":1},
+    {"at":"2026-11-19T07:00:30+08:00","online":false,"want":"checking_outage","posts":1},
+    {"at":"2026-11-19T07:00:40+08:00","want":"checking_outage","posts":1},
+    {"at":"2026-11-19T07:00:50+08:00","want":"browser_login_verified","posts":3,"account":"third","attempts":[["second","credential_rejected"],["third","browser_login_verified"]],"cooldown":"first"},
+    {"at":"2026-11-19T07:01:00+08:00","online":false,"want":"checking_outage","posts":3},
+    {"at":"2026-11-19T07:01:10+08:00","want":"checking_outage","posts":3},
+    {"at":"2026-11-19T07:01:20+08:00","portal":false,"want":"browser_form_not_found","posts":3},
+    {"at":"2026-11-19T07:01:25+08:00","portal":true,"want":"backoff_wait","posts":3},
+    {"at":"2026-11-19T22:59:59+08:00","actuate_at":"2026-11-19T23:00:00+08:00","want":"outside_window","posts":3},
+    {"at":"2026-11-19T23:00:00+08:00","want":"outside_window","posts":3},
+    {"at":"2026-11-20T23:59:59+08:00","wifi":"other","want":"different_or_ambiguous_wifi","window_day":"2026-11-20"},
+    {"at":"2026-11-21T00:59:59+08:00","wifi":"other","want":"different_or_ambiguous_wifi","window_day":"2026-11-20"},
+    {"at":"2026-11-21T01:00:00+08:00","want":"outside_window"},
+    {"at":"2026-11-21T06:59:59+08:00","want":"outside_window"},
+    {"at":"2026-11-21T07:00:00+08:00","wifi":"other","want":"different_or_ambiguous_wifi","window_day":"2026-11-21"},
+    {"at":"2026-11-22T00:59:59+08:00","wifi":"other","want":"different_or_ambiguous_wifi","window_day":"2026-11-21"},
+    {"at":"2026-11-22T01:00:00+08:00","want":"outside_window"},
+    {"at":"2026-11-22T22:59:59+08:00","wifi":"other","want":"different_or_ambiguous_wifi","window_day":"2026-11-22"},
+    {"at":"2026-11-22T23:00:00+08:00","want":"outside_window"},
+    {"at":"2026-11-23T00:45:00+08:00","want":"outside_window"},
+    {"at":"2026-11-23T07:00:00+08:00","pool_size":1,"want":"browser_login_verified","posts":4,"account":"first"},
+    {"at":"2026-11-23T07:00:10+08:00","online":false,"want":"checking_outage","posts":4},
+    {"at":"2026-11-23T07:00:20+08:00","want":"checking_outage","posts":4},
+    {"at":"2026-11-23T07:00:30+08:00","want":"cooldown_or_no_account","posts":4,"cooldown":"first"},
+    {"at":"2026-11-23T07:10:29+08:00","want":"backoff_wait","posts":4},
+    {"at":"2026-11-23T07:10:30+08:00","want":"browser_login_verified","posts":5,"account":"first"}
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "host": "127.0.0.1",
+  "relay_host": "localhost",
+  "strict_probe_host": "relay.campus.test",
+  "strict_probe_path": "/strict-relay",
+  "strict_probe_marker": "Relay reached",
+  "entry": "/",
+  "bootstrap": "/bootstrap",
+  "auth": "/eportal/index.jsp?wlanuserip=fake&wlanacname=fake&ssid=fake&nasip=fake&mac=fake&t=fake&url=fake",
+  "login": "/eportal/InterFace.do?method=login",
+  "logout": "/eportal/InterFace.do?method=logout",
+  "success": "/eportal/success.jsp",
+  "session_token": "fixture-session",
+  "other_session_token": "fixture-other-session",
+  "probe": "/online",
+  "username": "fixture-student",
+  "password": "fixture-pass",
+  "service": "宜宾移动"
+}

@@ -1,0 +1,43 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>本地校园网演练（假门户）</title>
+<p>只接受假账号，不连接校园网。</p>
+<label>账号 <input id="username"></label>
+<label>密码 <input id="pwd" type="password"></label>
+<button id="serviceShowHideTop">选择服务</button>
+<div id="serviceShowHide" hidden>
+  <div id="serviceContent"></div>
+</div>
+<input type="hidden" id="net_access_type">
+<button id="loginLink">登录</button>
+<script>
+const by = (id) => document.getElementById(id);
+by("serviceShowHideTop").onclick = () => {
+  by("serviceShowHide").hidden = false;
+  setTimeout(() => {
+    by("serviceContent").innerHTML =
+      `<button id="bch_service_0" onclick="selectService('其他服务','展示名相似的服务','0')">宜宾移动校园网</button>
+       <div id="bch_service_1" class="login_frame_hang"
+            onclick="selectService('宜宾移动','宜宾移动校园宽带','1')">
+         <span>宜宾移动校园宽带</span><small>推荐</small>
+       </div>`;
+  }, 220);
+};
+function selectService(value) {
+  by("net_access_type").value = value;
+  by("serviceShowHide").hidden = true;
+}
+by("loginLink").onclick = async () => {
+  const data = JSON.stringify({
+    username: by("username").value, password: by("pwd").value,
+    service: by("net_access_type").value
+  });
+  const submit = () => fetch("./InterFace.do?method=login", {method: "POST", body: data});
+  // Exercise the no-POST guard for the separate, navigation-only relay origin.
+  await fetch("__RELAY__", {method: "POST", mode: "no-cors", body: data}).catch(() => {});
+  const replies = await Promise.allSettled([submit(), submit()]);
+  if (replies.some((r) => r.status === "fulfilled" && r.value.ok)) {
+    location.href = "__SUCCESS__";
+  }
+};
+</script>

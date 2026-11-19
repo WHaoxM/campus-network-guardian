@@ -14,7 +14,8 @@ import time as clock
 import tomllib
 from urllib.parse import urlsplit
 
-from browser_login import Stop, credentials, online, run, single_instance, validate_config, wlan_interfaces
+from browser_login import Stop, online, run, single_instance, validate_config, wlan_interfaces
+from campus_accounts import load_accounts
 from campus_log import FILTERS, TEXT, date_label, safe_code, show_log
 from campus_status import DesktopStatus
 
@@ -141,7 +142,8 @@ class Controller:
             raise Stop("rehearsal_requires_isolated_loopback_config")
         self.disabled = set()
         self.ssid = self.portal["local"]["wifi_ssid"]
-        self.accounts = cfg["accounts"]
+        self.accounts = []
+        self.sync_accounts()
         self.log = logging.getLogger(str(self.root))
         self.log.setLevel(logging.INFO)
         limits = cfg["logging"]
@@ -151,6 +153,27 @@ class Controller:
                                       maxBytes=limits["max_bytes"], backupCount=limits["backups"], delay=True)
         handler.setFormatter(logging.Formatter("%(message)s"))
         self.log.addHandler(handler)
+
+    def sync_accounts(self):
+        try:
+            rows = load_accounts(self.cfg)
+        except (Stop, OSError):
+            rows = []
+        previous = {row["alias"]: row["password"] for row in self.accounts}
+        self.accounts = [dict(row, alias=row.get("alias", row["id"])) for row in rows]
+        for row in self.accounts:
+            if previous.get(row["alias"]) != row["password"]:
+                self.disabled.discard(row["alias"])
+
+    def guard_account(self, account, window, guid):
+        self.guard(window, guid)
+        try:
+            matches = any(row["id"] == account["id"] and row["username"] == account["username"]
+                          and row["password"] == account["password"] for row in load_accounts(self.cfg))
+        except (Stop, OSError):
+            matches = False
+        if not matches:
+            raise Stop("account_configuration_changed")
 
     def scenario(self):
         return json.loads(self.fixture_file.read_text(encoding="utf-8"))
@@ -306,8 +329,7 @@ class Controller:
         self.guard(window, guid)
         alias = account["alias"]
         cpath = self.cfg["browser_path"]
-        auth = credentials(cpath.parent / self.portal["local"]["credential_file"],
-                           (account["username_key"], account["password_key"]))
+        auth = (account["username"], account["password"])
         root = self.cfg["browser_root"]
         root.mkdir(parents=True, exist_ok=True)
         report = dict(documents=[], login_submissions=0, submission_clicked=False, success_page=False, network_online=False)
@@ -315,7 +337,7 @@ class Controller:
         try:
             with single_instance(root):
                 result = run(args, self.portal, cpath, root, report, account=auth, probe=probe,
-                             login_guard=lambda: self.guard(window, guid))
+                             login_guard=lambda: self.guard_account(account, window, guid))
         except Stop as exc:
             result = str(exc)
         except Exception as exc:
@@ -323,6 +345,7 @@ class Controller:
         return dict(alias=alias, result=result, submissions=report["login_submissions"])
 
     def tick(self):
+        self.sync_accounts()
         s = self.state()
         now = self.now().timestamp()
         window = self.window()
@@ -488,9 +511,9 @@ def main():
         elif args.mode == "observe":
             print(json.dumps(ctl.observe(), ensure_ascii=False))
         elif args.mode == "check":
-            path = ctl.cfg["browser_path"].parent / ctl.portal["local"]["credential_file"]
-            for account in ctl.accounts:
-                credentials(path, (account["username_key"], account["password_key"]))
+            ctl.accounts = load_accounts(ctl.cfg, strict=True)
+            if not ctl.accounts:
+                raise Stop("credentials_missing")
             root = ctl.cfg["browser_root"]
             root.mkdir(parents=True, exist_ok=True)
             with single_instance(root):

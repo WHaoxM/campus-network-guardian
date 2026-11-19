@@ -1,5 +1,8 @@
 {
   "status_file": "../campus/desktop/status.json",
+  "account_project": "../..",
+  "account_config": "../../config/campus.toml",
+  "account_python": "../../config/browser_python.txt",
   "profile_directory": "../desktop-profile",
   "ui_origin": "https://campus-guardian.test",
   "poll_ms": 1000,

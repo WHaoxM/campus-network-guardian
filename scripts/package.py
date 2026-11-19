@@ -62,7 +62,7 @@ def main():
                 continue
             path = PurePosixPath(entry.filename)
             if any(p in {"runtime", "captures", ".venv"} for p in path.parts) or path.name in {
-                ".env", "browser_python.txt", "browser_login.toml",
+                ".env", "browser_python.txt", "browser_login.toml", "accounts.private.json", "accounts.private.tmp",
             }:
                 raise SystemExit(f"Refusing to package non-public configuration: {path}")
             dest.writestr(f"{name}/{entry.filename}", source.read(entry))

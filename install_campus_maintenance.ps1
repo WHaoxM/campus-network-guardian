@@ -49,8 +49,15 @@ if ($Mode -eq 'Install') {
     & $python -X utf8 $script status --config $Config | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'The local portal profile is not configured or invalid. No task was changed.' }
 }
-if ($existing -and ($existing.Description -ne $description -or $existing.Actions[0].Execute -ne $python -or $existing.Actions[0].Arguments -ne $argsLine)) {
-    throw 'Ownership mismatch; no task was changed.'
+if ($existing) {
+    try {
+        $taskSid = ([Security.Principal.NTAccount]$existing.Principal.UserId).Translate([Security.Principal.SecurityIdentifier]).Value
+    } catch { $taskSid = $existing.Principal.UserId }
+    if ($taskSid -ne $identity.User.Value -or $existing.Description -ne $description -or
+        @($existing.Actions).Count -ne 1 -or $existing.Actions[0].Execute -ne $python -or
+        $existing.Actions[0].Arguments -ne $argsLine) {
+        throw 'Ownership mismatch; no task was changed.'
+    }
 }
 if ($Mode -eq 'Uninstall') {
     if ($existing) {

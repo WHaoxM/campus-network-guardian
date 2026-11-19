@@ -101,10 +101,8 @@ alias = "backup"
 username_key = "BACKUP_USER"
 password_key = "BACKUP_PASSWORD"
 """, encoding="utf-8")
-    _, backup_user, backup_password = spec["backup"]
-    (root / ".env").write_text(
-        f"FIXTURE_USER={spec['username']}\nFIXTURE_PASSWORD={spec['password']}\n"
-        f"BACKUP_USER={backup_user}\nBACKUP_PASSWORD={backup_password}\n", encoding="utf-8")
+    # No .env: the journey starts with an empty pool and enters the first account via the UI.
+    (root / "python.txt").write_text(sys.executable, encoding="utf-8")
     cmd = [sys.executable, "-X", "utf8", str(project / "campus_maintenance.py"),
            "watch", "--config", str(root / "campus.toml"), "--rehearsal-state", str(root / "current.json")]
     return cmd
@@ -140,7 +138,9 @@ def run(exe, output, preview):
         with rehearsal_directory(output) as root, ExitStack() as stack:
             cmd = configured_watch(root, project, server, spec)
             settings = json.loads(exe.with_name("desktop.json").read_text(encoding="utf-8"))
-            settings.update(status_file="watch/desktop/status.json", profile_directory="webview", poll_ms=350, fresh_seconds=3)
+            settings.update(status_file="watch/desktop/status.json", profile_directory="webview", poll_ms=350,
+                            fresh_seconds=3, account_project=str(project), account_config="campus.toml",
+                            account_python="python.txt")
             config = root / "desktop.json"
             config.write_text(json.dumps(settings), encoding="utf-8")
             with socket.socket() as listener:
@@ -156,6 +156,22 @@ def run(exe, output, preview):
             page.wait_for_url(settings["ui_origin"] + "/index.html", timeout=15000)
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))
+            ui_button = lambda name: page.get_by_role("button", name=name, exact=True)
+            expect(page.get_by_role("heading", name="添加校园网账号")).to_be_visible(timeout=12000)
+            expect(page.get_by_text("开启后，电脑开机时会自动运行。")).to_be_in_viewport()
+            page.screenshot(path=output / "desktop-first-run.png", animations="disabled")
+            first = page.locator("#first-account")
+            first_password = first.get_by_label("密码", exact=True)
+            first.get_by_label("校园网账号", exact=True).fill(spec["username"])
+            first_password.fill(spec["password"] + "-old")
+            ui_button("显示密码").click()
+            expect(first_password).to_have_attribute("type", "text")
+            ui_button("隐藏密码").click()
+            ui_button("保存并开启守护").click()
+            expect(page.get_by_role("heading", name="添加校园网账号")).to_be_hidden(timeout=12000)
+            if (root / ".env").exists() or server_state["submissions"]:
+                raise RuntimeError("First use created .env or attempted a portal sign-in")
+            checks.append("first_launch_saves_account_without_portal_or_legacy_file")
             heading = page.locator("#connection-heading")
             recovery = page.locator("#recovery-heading")
             guardian = page.locator("#guardian-state")
@@ -177,6 +193,51 @@ def run(exe, output, preview):
             expect(recovery).to_have_text("不在自动恢复时段")
             expect(page.locator("#last-checked")).to_contain_text("06:50")
             checks.append("outside_window_keeps_verified_online")
+            ui_button("账号管理").click()
+            pane = page.get_by_role("dialog")
+            accounts = pane.locator("#account-list li")
+            expected_tail = lambda name: "•••• " + name[-4:] if len(name) > 4 else "••••"
+            expect(accounts.first).to_contain_text(expected_tail(spec["username"]))
+            ui_button("修改密码").click()
+            pane.get_by_label("密码", exact=True).fill(spec["password"])
+            ui_button("保存").click()
+            expect(pane.get_by_role("heading", name="账号管理")).to_be_visible()
+            _, backup_user, backup_password = spec["backup"]
+            ui_button("＋ 添加备用账号").click()
+            pane.get_by_label("校园网账号").fill(backup_user)
+            pane.get_by_label("密码", exact=True).fill(backup_password)
+            ui_button("保存").click()
+            expect(accounts).to_have_count(2)
+            ui_button("设为主账号").click()
+            expect(accounts.first).to_contain_text(expected_tail(backup_user))
+            expect(accounts.first).to_contain_text("主账号")
+            ui_button("设为主账号").click()
+            expect(accounts.first).to_contain_text(expected_tail(spec["username"]))
+            page.screenshot(path=output / "desktop-accounts.png", animations="disabled")
+            for value in (spec["username"], spec["password"], backup_user, backup_password):
+                if value in pane.inner_text():
+                    raise RuntimeError("Account dialog shows a full credential")
+            ui_button("备用账号更多操作").click()
+            ui_button("删除").click()
+            expect(pane.get_by_role("heading", name="删除备用账号")).to_be_visible()
+            ui_button("删除").click()
+            expect(accounts).to_have_count(1)
+            ui_button("关闭账号管理").click()
+            page.reload()
+            expect(ui_button("账号管理")).to_be_visible(timeout=12000)
+            ui_button("账号管理").click()
+            expect(accounts).to_have_count(1)
+            expect(accounts.first).to_contain_text(expected_tail(spec["username"]))
+            # Keep one backup for the next outage; the verified main account
+            # enters cooldown and should not be retried in its place.
+            ui_button("＋ 添加备用账号").click()
+            pane.get_by_label("校园网账号").fill(backup_user)
+            pane.get_by_label("密码", exact=True).fill(backup_password)
+            ui_button("保存").click()
+            expect(accounts).to_have_count(2)
+            page.keyboard.press("Escape")
+            expect(pane).to_be_hidden()
+            checks.append("masked_account_crud_primary_order_and_persistent_reload")
 
             scenario("2026-11-19T06:51:00+08:00", "other")
             expect(heading).to_have_text("当前未接入 SUSE")

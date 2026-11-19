@@ -117,6 +117,8 @@ internal sealed class GuardianWindow : Form
     private readonly System.Windows.Forms.Timer timer;
     private readonly DesktopConfig config;
     private readonly StatusSource status;
+    private readonly AccountService accounts;
+    private bool accountRequestInProgress;
     private readonly string entry;
     private bool reading;
     private bool sending;
@@ -129,6 +131,7 @@ internal sealed class GuardianWindow : Form
     {
         this.config = config;
         status = new StatusSource(config, rehearsal);
+        accounts = new AccountService(config, rehearsal);
         entry = config.UiOrigin + "/index.html";
         Text = AppIdentity.Name;
         Size = new Size(config.WindowWidth, config.WindowHeight);
@@ -159,6 +162,8 @@ internal sealed class GuardianWindow : Form
             core.Settings.AreDefaultContextMenusEnabled = false;
             core.Settings.AreDevToolsEnabled = false;
             core.Settings.IsStatusBarEnabled = false;
+            core.Settings.IsPasswordAutosaveEnabled = false;
+            core.Settings.IsGeneralAutofillEnabled = false;
             core.NavigationStarting += (_, a) => a.Cancel = a.Uri != entry;
             core.FrameNavigationStarting += (_, a) => a.Cancel = true;
             core.NewWindowRequested += (_, a) => a.Handled = true;
@@ -182,6 +187,9 @@ internal sealed class GuardianWindow : Form
                     case "\"resume\"":
                         await SendControl("resume");
                         break;
+                    default:
+                        await SendAccountRequest(a.WebMessageAsJson);
+                        break;
                 }
             };
             core.Navigate(entry);
@@ -193,6 +201,26 @@ internal sealed class GuardianWindow : Form
                 Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
             Dispose();
         }
+    }
+
+    private async Task SendAccountRequest(string json)
+    {
+        if (!accounts.Available || IsDisposed || accountRequestInProgress
+            || json.Length is < 2 or > 4096 || json[0] != '{') return;
+        AccountRequest? request;
+        try { request = JsonSerializer.Deserialize<AccountRequest>(json, DesktopConfig.Json); }
+        catch (JsonException) { return; }
+        if (request is null) return;
+
+        accountRequestInProgress = true;
+        try
+        {
+            var reply = await accounts.HandleAsync(request);
+            if (!IsDisposed && view.CoreWebView2?.Source == entry)
+                view.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(reply, DesktopConfig.Json));
+        }
+        catch (InvalidOperationException) { /* WebView already closed. */ }
+        finally { accountRequestInProgress = false; }
     }
 
     private async Task SendControl(string action)

@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([ValidateSet('Status','Prepare','Install','Uninstall')][string]$Mode = 'Status')
+param([ValidateSet('Status','Prepare','Install','Uninstall')][string]$Mode = 'Status', [string]$StatusFile)
 
 $ErrorActionPreference = 'Stop'
 $exe = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'runtime\desktop\CampusGuardian.exe'))
@@ -7,6 +7,9 @@ $entry = '"' + $exe + '" --tray'
 $location = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 $name = 'SUSE.CampusNetworkGuardian'
 $controlDir = Join-Path $PSScriptRoot 'runtime\campus\desktop'
+if ($StatusFile -and [IO.Path]::GetFullPath($StatusFile) -ne (Join-Path $controlDir 'status.json')) {
+    throw 'Unexpected control path; no directory or startup change.'
+}
 $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User
 $ids = @($sid.Value, 'S-1-5-18', 'S-1-5-32-544')
 
@@ -29,7 +32,7 @@ function Read-StartupEntry {
 }
 
 $prior = Read-StartupEntry
-if ($Mode -ne 'Status' -and $null -ne $prior -and $prior -ne $entry) {
+if ($Mode -in @('Install','Uninstall') -and $null -ne $prior -and $prior -ne $entry) {
     throw 'Startup entry belongs to a different location; no change made.'
 }
 switch ($Mode) {
@@ -67,5 +70,6 @@ switch ($Mode) {
 [pscustomobject]@{
     Mode = $Mode
     Installed = (Read-StartupEntry) -eq $entry
+    Conflict = $null -ne $prior -and $prior -ne $entry
     PrivateControl = Test-ControlDirectory
 }

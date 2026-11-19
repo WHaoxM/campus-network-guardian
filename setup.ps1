@@ -24,4 +24,4 @@ $profile = Join-Path $config 'browser_login.toml'
 if (-not (Test-Path -LiteralPath $profile)) {
     Copy-Item -LiteralPath (Join-Path $config 'browser_login.example.toml') -Destination $profile
 }
-Write-Output 'Setup ready. Run .\demo.ps1 for a loopback-only desktop demonstration.'
+Write-Output 'Setup ready. Double-click runtime\desktop\CampusGuardian.exe (or open it with .\open_guardian.cmd).'

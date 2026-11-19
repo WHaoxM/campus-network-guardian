@@ -29,15 +29,13 @@
 
 **1. 安装一次，以后每天自动联网**
 
-解压 Windows 便携包后，先运行 `.\setup.ps1`。按 [安装说明](docs/INSTALL.md) 填好自己的校园网账号和 SUSE 登录入口，手动连上一次 SUSE，确认能上网。然后用管理员 PowerShell 在解压目录运行：
+按 [安装说明](docs/INSTALL.md) 安装 Python，然后在解压目录运行一次：
 
 ```powershell
-.\campus_maintenance.cmd check
-.\install_campus_maintenance.ps1 -Mode Install -Logon S4U
-.\switch_desktop.ps1 -Mode Activate
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1
 ```
 
-安装完成后不用每天运行命令。开机后，后台守护按配置的时段自动联网。
+用 Windows 手动连上一次 **SUSE**，双击 **open_guardian.cmd**。填校园网账号和密码，点 **保存并开启守护**，允许 Windows 权限提示。程序会安装开机任务，不用每天跑命令，也不用自己改配置文件。备用账号不是必填，以后想加，从右上角打开「账号管理」就行。
 
 **2. 平时只待在托盘，不挡屏幕**
 
@@ -60,4 +58,4 @@
 
 ## 开发
 
-Python 守护器和 WinForms/WebView2 界面是两个进程。界面只读取受限目录中的脱敏状态和日志；暂停由守护器执行并确认。详见 [开发与验收](docs/DEVELOPMENT.md) · [安全报告](SECURITY.md) · [MIT 许可证](LICENSE)。
+Python 守护器和 WinForms/WebView2 界面分别运行。账号在本机保存；状态页和日志不显示完整账号或密码。暂停由守护器执行并确认。详见 [开发与验收](docs/DEVELOPMENT.md) · [安全报告](SECURITY.md) · [MIT 许可证](LICENSE)。

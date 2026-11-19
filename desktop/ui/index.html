@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SUSE 校园网守护</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src data:; form-action 'none'; connect-src 'none'; base-uri 'none'">
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="style.css">
   <script defer src="app.js"></script>
@@ -17,11 +18,36 @@
         <button type="button" id="close" aria-label="收起演示窗口"><span class="cross" aria-hidden="true"></span></button>
       </div>
     </header>
+    <div class="nav-row">
     <div class="tabs" role="tablist" aria-label="守护器页面">
       <button type="button" id="tab-status" role="tab" aria-selected="true" aria-controls="panel-status">状态</button>
       <button type="button" id="tab-logs" role="tab" aria-selected="false" aria-controls="panel-logs" tabindex="-1" hidden>日志</button>
     </div>
+    <button id="account-open" type="button" class="outline account-open" hidden>账号管理</button>
+    </div>
     <section id="panel-status" class="content status-page" role="tabpanel" aria-labelledby="tab-status">
+      <div id="account-setup" class="account-setup" hidden>
+        <h1>添加校园网账号</h1>
+        <p class="muted">填写你的四川轻化工大学校园网账号。</p>
+        <form id="first-account" novalidate autocomplete="off">
+          <label for="first-username">校园网账号</label>
+          <input id="first-username" maxlength="128" placeholder="请输入账号" spellcheck="false" required>
+          <label for="first-password">密码</label>
+          <div class="password-input">
+            <input id="first-password" type="password" maxlength="256" placeholder="请输入密码" autocomplete="new-password" required>
+            <button id="first-reveal" type="button" class="password-reveal" aria-label="显示密码" aria-pressed="false">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M2 12s3.4-6 10-6 10 6 10 6-3.4 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.8"/></svg>
+            </button>
+          </div>
+          <button id="first-submit" type="submit" class="primary">保存并开启守护</button>
+          <p class="muted">开启后，电脑开机时会自动运行。</p>
+        </form>
+      </div>
+      <div id="account-notice" class="account-notice" hidden>
+        <p id="account-feedback" role="status"></p>
+        <button id="enable-guardian" type="button" class="outline account-open" hidden>开启守护</button>
+      </div>
+      <div id="monitor-content">
       <div class="overview">
         <div class="connection">
           <span class="online-dot" aria-hidden="true"></span>
@@ -47,6 +73,7 @@
         <ol id="recent-list" class="event-list"></ol>
         <p id="recent-empty" class="log-hint muted" hidden>暂无重要事件</p>
       </section>
+      </div>
     </section>
     <section id="panel-logs" class="content logs-page" role="tabpanel" aria-labelledby="tab-logs" hidden>
       <div class="filters" role="group" aria-label="日志筛选">
@@ -62,6 +89,37 @@
       </table>
       <p id="log-hint" class="log-hint muted" aria-live="polite"></p>
     </section>
+    <dialog id="account-dialog" aria-labelledby="account-dialog-title">
+      <header class="dialog-header">
+        <h2 id="account-dialog-title">账号管理</h2>
+        <button type="button" id="account-close" class="dialog-close" aria-label="关闭账号管理">×</button>
+      </header>
+      <div id="account-list-view">
+        <p class="muted">优先使用主账号，需要时再用备用账号。</p>
+        <ul id="account-list" class="account-list"></ul>
+        <button type="button" id="add-account" class="text-action">＋ 添加备用账号</button>
+      </div>
+      <form id="edit-account" autocomplete="off" novalidate hidden>
+        <div id="edit-user-field">
+          <label for="edit-username">校园网账号</label>
+          <input id="edit-username" maxlength="128" placeholder="请输入账号" spellcheck="false">
+        </div>
+        <label for="edit-password">密码</label>
+        <input id="edit-password" type="password" maxlength="256" placeholder="请输入密码" autocomplete="new-password" required>
+        <div class="dialog-actions">
+          <button type="button" class="outline account-open" id="edit-back">返回</button>
+          <button type="submit" class="primary">保存</button>
+        </div>
+      </form>
+      <div id="remove-account" hidden>
+        <p>删除后，守护器不会再尝试使用这个备用账号。</p>
+        <div class="dialog-actions">
+          <button type="button" class="outline account-open" id="remove-back">返回</button>
+          <button type="button" class="primary" id="remove-confirm">删除</button>
+        </div>
+      </div>
+      <p id="account-dialog-feedback" class="account-message" role="status" hidden></p>
+    </dialog>
   </main>
   <button id="reopen" class="reopen outline" type="button" hidden>打开校园网守护</button>
   <footer class="demo-note">交互演示 · 不改变当前网络</footer>

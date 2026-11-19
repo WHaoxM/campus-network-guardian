@@ -10,6 +10,7 @@ import time
 CODE = re.compile(r"[A-Za-z_][A-Za-z0-9_-]{0,80}")
 LEGACY = re.compile(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}),\d+ ([A-Za-z_][A-Za-z0-9_-]*) (.*)$")
 TEXT = {
+    "account_configuration_changed": ("auth", "账号配置已更新，本次未提交"),
     "watch_started": ("system", "守护已启动"),
     "desktop_paused": ("schedule", "已暂停自动恢复"),
     "desktop_resumed": ("schedule", "已提前结束暂停"),

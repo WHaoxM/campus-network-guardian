@@ -3,10 +3,10 @@ channel = "msedge"
 headless = true
 timeout_seconds = 22
 navigation_timeout_seconds = 50
-# Replace these three placeholders with the portal published by your network operator.
-entry_url = "http://portal.example.test/"
-portal_origin = "http://portal.example.test"
-allowed_origins = ["http://portal.example.test"]
+# SUSE profile. Do not copy per-connection URLs, cookies or query values here.
+entry_url = "http://10.23.2.4/"
+portal_origin = "http://10.23.2.4"
+allowed_origins = ["http://10.23.2.4", "http://10.23.2.4:8080", "http://10.23.3.4:89", "http://123.123.123.123"]
 auth_path = "/eportal/index.jsp"
 success_path = "/eportal/success.jsp"
 login_path = "/eportal/InterFace.do"
@@ -14,7 +14,7 @@ auth_query_keys = ["wlanuserip", "wlanacname", "ssid", "nasip", "mac", "t", "url
 metadata_paths = ["/eportal/InterFace.do", "/eportal/userV2.do"]
 metadata_methods = ["pageInfo", "getServices", "getOnlineUserInfo", "getErrorMsg", "portalAuthSuccessConfig"]
 diagnostic_paths = ["/eportal/redirectortosuccess.jsp"]
-http_relay_origins = []
+http_relay_origins = ["http://123.123.123.123"]
 service_labels = ["宜宾移动校园宽带", "宜宾移动校园网", "宜宾移动校园网宽带", "宜宾移动"]
 service_value = "宜宾移动"
 credential_rejection_messages = ["用户名或密码错误", "账号或密码错误", "密码错误"]

@@ -28,6 +28,9 @@ function Write-Config([string]$Text) {
 }
 
 $statusPath = Join-Path $PSScriptRoot 'runtime\campus\desktop\status.json'
+if ($Mode -eq 'Rollback' -and (Test-Path -LiteralPath (Join-Path (Split-Path $statusPath) 'accounts.private.json'))) {
+    throw 'The managed account pool needs desktop status enabled. To stop only the tray, use install_desktop.ps1 -Mode Uninstall.'
+}
 $installer = Join-Path $PSScriptRoot 'install_desktop.ps1'
 $existingStartup = & $installer -Mode Status
 if ($Mode -eq 'Activate') {

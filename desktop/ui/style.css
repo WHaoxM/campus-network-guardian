@@ -213,3 +213,84 @@ h2 { font-size: max(20px, calc(46 * var(--u))); font-weight: 700; line-height: 1
   .filters button { min-width: 52px; min-height: 40px; padding-inline: 8px; }
   .recent { padding-bottom: 20px; }
 }
+
+.nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1.5px solid var(--line);
+  padding-right: max(14px, calc(31 * var(--u)));
+}
+.nav-row .tabs { border-bottom: 0; }
+.nav-row button[role="tab"] { margin-bottom: -1.5px; }
+.account-open { padding: 6px 13px; min-width: auto; min-height: 34px; font-size: 15px; }
+.account-setup { padding: clamp(24px, 5vw, 49px) 4px 0; }
+.account-setup h1 { font-size: clamp(26px, 4vw, 36px); margin-bottom: 8px; }
+.account-setup p { line-height: 1.55; }
+.account-setup form { max-width: 470px; margin-block: 20px 14px; }
+.account-setup label, #account-dialog label { display: block; font-weight: 650; margin: 16px 0 6px; }
+.account-setup input, #account-dialog input {
+  width: 100%; border: 1px solid #8f959b; border-radius: 6px; min-height: 40px;
+  padding: 9px 12px; color: var(--ink); background: white; font: inherit;
+}
+.account-setup input:focus-visible, #account-dialog input:focus-visible {
+  outline: 2px solid var(--blue); outline-offset: 1px;
+}
+.password-input { position: relative; }
+.password-input input { padding-right: 46px; }
+.password-reveal, .dialog-close {
+  border: 0; background: transparent; border-radius: 5px; color: var(--muted);
+  display: grid; place-items: center; width: 38px; min-height: 34px;
+}
+.password-reveal { position: absolute; right: 3px; top: 3px; bottom: 3px; }
+.password-reveal svg { width: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+.password-reveal:hover, .dialog-close:hover { background: #edf3f9; }
+.primary {
+  border: 1px solid #005bbb; border-radius: 6px; min-height: 40px; padding: 8px 16px;
+  background: #0864cb; color: white; font-weight: 650;
+}
+.primary:hover { background: #0056af; }
+.primary:focus-visible { outline-color: white; }
+.primary:disabled { opacity: .6; cursor: default; }
+#first-submit { width: 100%; margin: 20px 0 10px; }
+.account-notice {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 11px; margin-block: 10px; border-radius: 6px;
+  background: #edf3f9; color: var(--blue-ink);
+}
+#account-dialog {
+  padding: 20px 24px; width: min(470px, calc(100% - 28px)); max-width: none;
+  max-height: calc(100% - 26px); color: var(--ink); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 38px #0c0e1140;
+}
+#account-dialog::backdrop { background: #10101051; }
+.dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.dialog-header h2 { font-size: 24px; }
+.dialog-close { font-size: 24px; line-height: 1; }
+.account-list { list-style: none; margin: 16px 0 8px; padding: 0; border-top: 1px solid var(--line); }
+.account-list li {
+  min-height: 62px; display: flex; justify-content: space-between; align-items: center;
+  gap: 10px; padding-block: 6px; border-bottom: 1px solid var(--line);
+}
+.account-tail { display: block; margin-top: 4px; font-size: 14px; }
+.account-actions { display: flex; align-items: center; position: relative; }
+.text-action { border: 0; padding: 7px; background: transparent; color: #005fbc; border-radius: 5px; }
+.text-action:hover { background: #e9f2fc; }
+.text-action:disabled { opacity: .6; cursor: default; }
+.account-more { color: var(--muted); min-width: 33px; font-size: 20px; }
+.account-more-menu {
+  position: absolute; right: 0; top: 100%; z-index: 1; padding: 4px;
+  display: grid; min-width: 110px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--surface); box-shadow: 0 4px 10px #0c0e1120;
+}
+.account-more-menu button { text-align: left; }
+.dialog-actions { display: flex; gap: 9px; justify-content: flex-end; margin-top: 16px; }
+.account-message { margin-top: 10px; color: var(--blue-ink); }
+
+@media (max-height: 500px) {
+  .account-setup { padding-top: 23px; }
+  .account-setup form { margin-top: 12px; }
+  .account-setup label { margin-top: 10px; }
+  #first-submit { margin-top: 14px; }
+}

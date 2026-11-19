@@ -1,5 +1,6 @@
 browser_config = "browser_login.toml"
 runtime_dir = "../runtime/campus"
+desktop_status_file = "desktop/status.json"
 task_name = "CampusNetwork-Maintenance"
 python_path_file = "browser_python.txt"
 task_watchdog_minutes = 5

@@ -5,7 +5,8 @@ using System.Text.Json;
 namespace CampusGuardian;
 
 internal sealed record DesktopConfig(string StatusFile, string ProfileDirectory, string UiOrigin,
-    int PollMs, int FreshSeconds, int WorkingSeconds, int ProbeFreshSeconds, int WindowWidth, int WindowHeight)
+    int PollMs, int FreshSeconds, int WorkingSeconds, int ProbeFreshSeconds, int WindowWidth, int WindowHeight,
+    string? AccountProject = null, string? AccountConfig = null, string? AccountPython = null)
 {
     internal static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
         { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
@@ -26,6 +27,9 @@ internal sealed record DesktopConfig(string StatusFile, string ProfileDirectory,
         {
             StatusFile = Path.GetFullPath(c.StatusFile, directory),
             ProfileDirectory = Path.GetFullPath(c.ProfileDirectory, directory),
+            AccountProject = c.AccountProject is null ? null : Path.GetFullPath(c.AccountProject, directory),
+            AccountConfig = c.AccountConfig is null ? null : Path.GetFullPath(c.AccountConfig, directory),
+            AccountPython = c.AccountPython is null ? null : Path.GetFullPath(c.AccountPython, directory),
         };
     }
 }

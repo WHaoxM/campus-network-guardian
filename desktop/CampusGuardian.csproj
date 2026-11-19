@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>CampusGuardian</AssemblyName>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Product>SUSE 校园网守护</Product>
     <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
     <ApplicationIcon>assets/campus-guardian.ico</ApplicationIcon>

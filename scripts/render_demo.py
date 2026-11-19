@@ -35,17 +35,21 @@ def main():
         file.ico.getimage((64, 64)).save(out / "icon.png")
 
     captions = (
-        ("online", "status", "01   查看联网状态"),
-        ("logs", "logs", "02   打开日志，筛选重要记录"),
-        ("paused", "paused", "03   暂停自动恢复，等待后台确认"),
+        ("first-run", "01   首次打开，填上校园网账号", 3500),
+        ("wifi-join", "02   没连 Wi-Fi、也没外网，先尝试接入 SUSE", 3300),
+        ("online", "03   连上 SUSE 后登录，确认外网恢复", 2900),
+        ("other-wifi", "04   连着其他 Wi-Fi，即使没网也不抢占", 3300),
+        ("accounts", "05   从右上角管理主账号和备用账号", 2900),
+        ("logs", "06   查看登录结果，只看重要记录", 2900),
     )
+    for source, target in (("online", "status"), ("logs", "logs"), ("paused", "paused")):
+        copyfile(args.capture / f"desktop-{source}.png", out / f"{target}.png")
     frames = []
     font = ImageFont.truetype(args.ui_font, 20)
     label_font = ImageFont.truetype(args.ui_font, 16)
-    for source, target, label in captions:
-        path = args.capture / f"desktop-{source}.png"
-        copyfile(path, out / f"{target}.png")
-        shot = Image.open(path).convert("RGB")
+    for source, label, _ in captions:
+        with Image.open(args.capture / f"desktop-{source}.png") as file:
+            shot = file.convert("RGB")
         shot.thumbnail((900, 570), Image.Resampling.LANCZOS)
         frame = Image.new("RGB", (936, 640), "#e8efeb")
         draw = ImageDraw.Draw(frame)
@@ -54,7 +58,7 @@ def main():
         frame.paste(shot, ((936 - shot.width) // 2, 54))
         frames.append(frame)
     frames[0].save(out / "desktop-flow.gif", save_all=True, append_images=frames[1:],
-                   duration=(3000, 3000, 3500), loop=0, optimize=True)
+                   duration=[duration for _, _, duration in captions], loop=0, optimize=True)
 
     terminal = Image.new("RGB", (936, 260), "#14221c")
     draw = ImageDraw.Draw(terminal)

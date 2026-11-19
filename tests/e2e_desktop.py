@@ -213,6 +213,9 @@ def run(exe, output, preview):
             expect(accounts.first).to_contain_text("主账号")
             ui_button("设为主账号").click()
             expect(accounts.first).to_contain_text(expected_tail(spec["username"]))
+            ui_button("关闭账号管理").click()
+            ui_button("账号管理").click()
+            expect(accounts).to_have_count(2)
             page.screenshot(path=output / "desktop-accounts.png", animations="disabled")
             for value in (spec["username"], spec["password"], backup_user, backup_password):
                 if value in pane.inner_text():
@@ -249,9 +252,27 @@ def run(exe, output, preview):
                 raise RuntimeError("Unexpected portal action outside allowed schedule")
             checks.append("link_and_internet_are_distinct_and_no_action_outside_window")
 
+            state_path = root / "watch/state.json"
+            scenario("2026-11-19T07:04:50+08:00", "other")
+            wait_for_json(state_path, lambda state: state["outcome"] == "different_or_ambiguous_wifi",
+                          10, "Other Wi-Fi was not preserved in the allowed window")
+            expect(heading).to_have_text("当前未接入 SUSE")
+            expect(recovery).to_have_text("自动恢复已启用")
+            if server_state["submissions"] or "wifi_join_requested_fixture" in (root / "watch/campus.log").read_text(encoding="utf-8"):
+                raise RuntimeError("Took over another Wi-Fi")
+            page.screenshot(path=output / "desktop-other-wifi.png", animations="disabled")
+
+            scenario("2026-11-19T07:05:00+08:00", "none")
+            expect(heading).to_have_text("Wi-Fi 尚未连接")
+            expect(page.locator("#recent-list")).to_contain_text("演练：已请求接入 SUSE")
+            if server_state["submissions"] or server_state["logout_posts"]:
+                raise RuntimeError("Portal authentication was submitted before the SUSE link was ready")
+            page.screenshot(path=output / "desktop-wifi-join.png", animations="disabled")
+            checks.append("other_wifi_untouched_join_before_portal_authentication")
+
             server_state["on_form"] = lambda: deferred_form.wait(timeout=30)
             page.bring_to_front()
-            scenario("2026-11-19T07:05:00+08:00", "campus")
+            scenario("2026-11-19T07:05:05+08:00", "campus")
             expect(page.locator("#recovery-detail")).to_have_text("正在验证校园网登录", timeout=15000)
             deferred_form.set()
             expect(heading).to_have_text("SUSE 外网在线", timeout=30000)
@@ -299,8 +320,8 @@ def run(exe, output, preview):
             scenario("2026-11-19T07:07:00+08:00", "none")
             expect(heading).to_have_text("Wi-Fi 尚未连接")
             current_events = (root / "watch/campus.log").read_text(encoding="utf-8")
-            if server_state["submissions"] != 1 or "wifi_join_requested_fixture" in current_events:
-                raise RuntimeError("The pause gate allowed a second portal submission or a Wi-Fi join")
+            if server_state["submissions"] != 1 or current_events.count('"code": "wifi_join_requested_fixture"') != 1:
+                raise RuntimeError("The pause gate allowed a second portal submission or an additional Wi-Fi join")
             checks.append("pause_waits_for_ack_blocks_prepared_login_and_join_but_observes")
 
             if not preview:

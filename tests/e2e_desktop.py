@@ -79,6 +79,12 @@ def configured_watch(root, project, server, spec):
     browser = root / "browser_login.toml"
     base, relay = (f"http://{spec[key]}:{server.server_port}" for key in ("host", "relay_host"))
     write_browser(browser, (source / "browser_login.example.toml").read_text(encoding="utf-8"), base, relay, spec)
+    # The form is intentionally held until the real window has displayed its
+    # recovery state. A two-second test navigation timeout races that observation.
+    template = browser.read_text(encoding="utf-8")
+    template = re.sub(r"(?m)^navigation_timeout_seconds\s*=.*$", "navigation_timeout_seconds = 18", template)
+    template = re.sub(r"(?m)^timeout_seconds\s*=.*$", "timeout_seconds = 18", template)
+    browser.write_text(template, encoding="utf-8")
     campus = (source / "campus.toml").read_text(encoding="utf-8").split("[[accounts]]", 1)[0]
     campus = re.sub(r"(?m)^desktop_status_file\s*=.*\n?", "", campus)
     campus = re.sub(r'(?m)^runtime_dir\s*=.*$',
@@ -182,7 +188,8 @@ def run(exe, output, preview):
                 raise RuntimeError("Unexpected portal action outside allowed schedule")
             checks.append("link_and_internet_are_distinct_and_no_action_outside_window")
 
-            server_state["on_form"] = lambda: deferred_form.wait(timeout=10)
+            server_state["on_form"] = lambda: deferred_form.wait(timeout=30)
+            page.bring_to_front()
             scenario("2026-11-19T07:05:00+08:00", "campus")
             expect(page.locator("#recovery-detail")).to_have_text("正在验证校园网登录", timeout=15000)
             deferred_form.set()
@@ -217,6 +224,7 @@ def run(exe, output, preview):
 
             # Let the watcher start a second recovery, then pause it through
             # the real UI before the already-prepared request reaches its gate.
+            page.bring_to_front()
             deferred_form.clear()
             scenario("2026-11-19T07:06:00+08:00", "campus")
             server_state["accepted"] = False

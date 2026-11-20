@@ -136,11 +136,15 @@ def windows_dns_signals(cfg, guid):
     if not hosts:
         return None
     script = Path(__file__).with_name("network_diagnostics.ps1")
+    # Match wlan_source: keep PowerShell hidden without losing redirected output.
+    startup = subprocess.STARTUPINFO()
+    startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    startup.wShowWindow = subprocess.SW_HIDE
     try:
         raw = subprocess.check_output(
             [cfg["windows"]["powershell"], "-NoLogo", "-NoProfile", "-NonInteractive",
              "-ExecutionPolicy", "Bypass", "-File", str(script), "-WifiGuid", guid, "-ProbeHosts", ",".join(hosts)],
-            timeout=timeout, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW,
+            timeout=timeout, stderr=subprocess.DEVNULL, startupinfo=startup,
         )
         data = json.loads(raw)
         return data if isinstance(data, dict) else None

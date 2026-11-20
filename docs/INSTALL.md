@@ -1,54 +1,22 @@
 # Windows 安装与使用
 
-仅适配四川轻化工大学 SUSE 校园网。电脑需要是 Windows x64，并且已经可以访问网络来完成这一次准备。
+## 首次使用
 
-## 1. 准备环境
+- 完整解压 Windows x64 便携包，放到之后不会随意移动的目录。
+- 安装 [64 位 Python](https://www.python.org/downloads/windows/)（建议 3.13，最低 3.11；勾选 **Add Python to PATH**），确认有 Microsoft Edge 和 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/concepts/distribution)。
+- 手动连上一次 **SUSE**，让 Windows 保存 Wi‑Fi 配置。双击 `suse.cmd`，或从 PowerShell 运行 `.\suse.cmd`。首次联网装依赖；以后打开不会重复安装，不用手动运行 pip 或下载 Chromium。
+- 填入自己的校园网账号和密码，点「保存并开启守护」，允许 Windows 权限提示。要加备用账号时再点右上角「账号管理」。
 
-安装 [64 位 Python](https://www.python.org/downloads/windows/)（推荐 3.13，最低 3.11），安装时勾选 **Add Python to PATH**。确认系统有 Microsoft Edge 和 [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)。
+开启后，计划任务负责启动后台守护；登录 Windows 后可从托盘打开窗口。关窗口不会停止守护。网络是否真的恢复以状态页为准；无人登录时的开机恢复取决于该电脑的 Windows 运行环境。
 
-把便携包完整解压到一个长期使用的目录。在该目录打开 PowerShell，运行一次：
+## 日常行为
 
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1
-```
+默认北京时间周一到周四、周日 07:00–23:00，周五、周六 07:00–次日 01:00。窗口结束不主动下线。
 
-这一步会在目录内创建 Python 环境，安装固定版本的 Playwright，并生成默认校园网配置。**不需要手动安装 Playwright、再下载 Chromium，或编辑配置文件。** 首次安装依赖需要联网。
+没有 Wi‑Fi 和外网时，守护器尝试连接已保存的 SUSE。其他 Wi‑Fi 不抢占；SUSE 地址没就绪不会提交认证。网络类认证失败可在「登录」日志看到 DNS 诊断，守护器不改系统 DNS，也不关闭 VPN。
 
-便携包包含桌面程序，不需要安装 .NET SDK。从源码运行才需要 [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)，然后执行 `.\build_desktop.ps1`。
+## 旧版与卸载
 
-## 2. 连接 SUSE，填一次账号
-
-1. 先用 Windows 手动连上 SUSE，让系统保存这个 Wi-Fi 配置。守护器不会替你创建新 Wi-Fi 配置，也不会抢占其他正在使用的网络。
-2. 双击 **open_guardian.cmd**，填写你自己的校园网账号和密码，点击 **保存并开启守护**。
-3. Windows 弹出权限提示时允许。开机任务注册并启动后，程序回到状态页。注册不等于已经联网，网络结果以状态页的探测为准。
-
-只填一个账号也能用。以后从右上角「账号管理」修改密码、添加备用账号或调整主账号。已联网时改账号不会为了验证密码而主动断开；更新会用于之后的登录。密码只保存在本机受限目录，不出现在日志里；账号列表只显示尾号。
-
-如果暂停或拒绝了 Windows 权限提示，账号仍保留，可直接在状态页点「开启守护」。启用失败时先看界面提示。若另一安装目录已登记同名任务或托盘启动项，先从旧目录卸载，不要让两份守护同时运行。
-
-## 3. 日常使用
-
-开机后，计划任务启动后台守护；登录 Windows 后，图标留在系统托盘。点图标查看状态、筛日志或暂停，点窗口右上角 **×** 收回托盘。关窗不会停止后台任务。
-
-默认北京时间周一到周四、周日 07:00–23:00，周五、周六 07:00–次日 01:00；窗口结束后不主动下线。
-
-时段内没有 Wi‑Fi、也没有外网时，守护器查看附近是否有 SUSE，并尝试接入 Windows 已保存的配置。如果 Windows 不允许读取附近网络，仍可尝试已保存的 SUSE，不必更改定位权限。已连着其他 Wi‑Fi 不抢占；SUSE 地址未就绪时不提交认证。
-
-认证遇到连接、代理或 DNS 一类的问题，守护器只读对照系统 DNS 与 Wi‑Fi 配置的 DNS，结果可在「日志」的「登录」分类查看。如果日志同时提示 VPN 线索，可以先检查软件的 DNS 或退出状态。守护器不会关 VPN、清 DNS 缓存、修改代理或把网络错误当成密码错误。
-
-无人登录时，实际接入仍取决于该电脑上 Windows 计划任务能否访问 Wi-Fi、Edge 与项目目录。第一次部署后，建议在方便时验证一次开机恢复。工具不会开启 Windows 自动登录。
-
-## 停用和卸载
-
-从旧包迁移到新位置时，也应先在旧目录做下面的操作。以安装时同一个 Windows 账户打开管理员 PowerShell：
-
-```powershell
-.\install_campus_maintenance.ps1 -Mode Uninstall -Logon S4U
-.\install_desktop.ps1 -Mode Uninstall
-```
-
-从托盘退出界面。卸载启动项不会主动登出校园网，也不会删除本地账号和日志。不再使用时，可以在确认任务已卸载后删除解压目录。
-
-## 从早期版本升级
-
-已有的 `.env` 和自订门户配置不会被安装脚本覆盖。界面可读取旧账号列表；第一次在界面改账号时，会将现有账号一起迁入新的本地账号池。迁移后日常以界面为准，不再在 `.env` 里改账号。如果你保留的是早期未配置的占位门户文件，先用新便携包在新目录按上面的步骤配置。
+- 若安装包没有 `suse.cmd`，请按[旧版安装说明](https://github.com/WHaoxM/campus-network-guardian/blob/v0.2.1/docs/INSTALL.md)操作。
+- **不要把新版直接覆盖旧目录。** 现有计划任务和托盘启动项使用旧目录的绝对路径，检测到冲突时新版不会自动接管。保留旧目录和账号；跨目录迁移暂未验证。
+- 需要停用时，请按[维护文档](DEVELOPMENT.md#停用与卸载)处理。停用不会主动下线或删除账号。

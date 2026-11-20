@@ -1,4 +1,4 @@
-"""Bundle the committed public source, Windows publish output and upstream notices."""
+"""Bundle only the committed runtime inputs, Windows build and upstream notices."""
 from argparse import ArgumentParser
 import hashlib
 import io
@@ -7,6 +7,29 @@ from pathlib import Path, PurePosixPath
 import re
 import subprocess
 from zipfile import ZIP_DEFLATED, ZipFile
+
+
+PUBLIC_FILES = {
+    "suse.cmd": "suse.cmd", "README.md": "README.md", "LICENSE": "LICENSE",
+    "docs/media/icon.png": "app/media/icon.png",
+    "docs/media/desktop-flow.gif": "app/media/desktop-flow.gif",
+    **{name: f"app/{name}" for name in (
+        "setup.ps1", "scripts/suse.ps1", "requirements.txt",
+        "browser_login.py", "campus_maintenance.py", "campus_accounts.py", "campus_status.py", "campus_log.py",
+        "network_diagnostics.ps1", "enable_guardian.ps1", "install_campus_maintenance.ps1", "install_desktop.ps1",
+        "config/browser_login.example.toml", "config/campus.toml",
+    )},
+}
+SOURCE_REPO = "https://github.com/WHaoxM/campus-network-guardian"
+
+
+def portable_readme(data):
+    text = data.decode("utf-8")
+    for name in ("docs/media/icon.png", "docs/media/desktop-flow.gif"):
+        text = text.replace(name, PUBLIC_FILES[name])
+    for name in ("docs/INSTALL.md", "docs/DEVELOPMENT.md", "SECURITY.md"):
+        text = text.replace(f"({name}", f"({SOURCE_REPO}/blob/main/{name}")
+    return text.encode("utf-8")
 
 
 def git(root, *args):
@@ -37,6 +60,8 @@ def main():
     }
     versions = {name.lower(): version for name, version in
                 (key.split("/", 1) for key in metadata["libraries"])}
+    if versions.get("campusguardian") != args.version:
+        raise SystemExit("Desktop build version differs from the requested package version.")
     packages = root / "runtime/desktop-build/packages"
     notices = {}
     for key, (label, primary) in manifests.items():
@@ -48,27 +73,30 @@ def main():
             file = root_package / filename
             if not file.is_file():
                 raise SystemExit(f"Missing {label} redistribution notice: {filename}")
-            notices[f"licenses/{label}/{filename}"] = file
+            notices[f"app/licenses/{label}/{filename}"] = file
 
     release = root / "runtime/release"
     release.mkdir(parents=True, exist_ok=True)
     name = f"CampusNetworkGuardian-{args.version}-win-x64"
     output = release / f"{name}.zip"
     pending = output.with_suffix(".tmp")
-    with ZipFile(io.BytesIO(git(root, "archive", "--format=zip", "HEAD"))) as source, \
+    with ZipFile(io.BytesIO(git(root, "archive", "--format=zip", "HEAD", "--", *PUBLIC_FILES))) as source, \
             ZipFile(pending, "w", compression=ZIP_DEFLATED, compresslevel=6) as dest:
-        for entry in source.infolist():
-            if entry.is_dir():
-                continue
-            path = PurePosixPath(entry.filename)
-            if any(p in {"runtime", "captures", ".venv"} for p in path.parts) or path.name in {
-                ".env", "browser_python.txt", "browser_login.toml", "accounts.private.json", "accounts.private.tmp",
-            }:
-                raise SystemExit(f"Refusing to package non-public configuration: {path}")
-            dest.writestr(f"{name}/{entry.filename}", source.read(entry))
+        if {e.filename for e in source.infolist() if not e.is_dir()} != PUBLIC_FILES.keys():
+            raise SystemExit("Committed runtime archive does not match its allowlist.")
+        for original, target in PUBLIC_FILES.items():
+            data = source.read(original)
+            dest.writestr(f"{name}/{target}", portable_readme(data) if original == "README.md" else data)
         for file in sorted(build.rglob("*")):
             if file.is_file() and file.suffix.lower() not in {".pdb", ".xml"}:
-                dest.write(file, f"{name}/runtime/desktop/{file.relative_to(build).as_posix()}")
+                relative = PurePosixPath(file.relative_to(build).as_posix())
+                if relative.suffix.lower() not in {".dll", ".exe", ".json", ".html", ".js", ".css", ".dat", ".bin"}:
+                    raise SystemExit(f"Unexpected file in desktop build: {relative}")
+                if relative.suffix.lower() == ".json" and relative.name not in {
+                    "desktop.json", "CampusGuardian.deps.json", "CampusGuardian.runtimeconfig.json",
+                }:
+                    raise SystemExit(f"Unexpected desktop configuration: {relative}")
+                dest.write(file, f"{name}/app/runtime/desktop/{relative}")
         for filename, file in notices.items():
             dest.write(file, f"{name}/{filename}")
     pending.replace(output)

@@ -45,8 +45,16 @@ flowchart LR
 .\.venv\Scripts\python.exe -X utf8 tests/e2e_desktop.py --exe runtime/desktop/CampusGuardian.exe --output runtime/desktop-e2e
 ```
 
-打包时先提交公开源码、重新构建，再运行 `python scripts/package.py --version 0.2.1`。输出 Windows ZIP 和 SHA-256；随包的 `licenses/` 记录 .NET 和 WebView2 SDK 的原始许可。
+打包前先提交公开源码、重新构建，再运行 `python scripts/package.py --version 0.2.2`。ZIP 按运行文件清单生成，第三方许可在 `app/licenses/`。测试、演练与开发脚本只留源码，不随包发；发布方应从实际解压包验证入口，而不是让下载者跑测试。
+
+```powershell
+.\.venv\Scripts\python.exe -X utf8 tests/e2e_distribution.py --zip runtime/release/CampusNetworkGuardian-0.2.2-win-x64.zip --output runtime/distribution-e2e
+```
 
 README 的媒体取自同一次回环演练。GIF 依次展示首次填号、模拟接入 SUSE、外网验证、保留其他 Wi‑Fi、账号管理和日志；Wi‑Fi 状态和门户均为模拟。PNG 来自实际桌面窗口，终端图取自真实演练输出。提交 issue 时仅附不含身份的结果代码与复现情况。
 
 README 的呈现参考了 [Arcane](https://github.com/getarcaneapp/arcane#readme) 的首屏实物图、[uv](https://github.com/astral-sh/uv#readme) 的可复制命令与输出、[江山时序](https://github.com/DeanChensj/jiangshan-map/blob/main/README_ZH.md) 的短演示与真实使用场景。未复用这些项目的代码、图片或标识。
+
+## 停用与卸载
+
+在现有安装目录操作。用管理员 PowerShell 运行运行目录里的 `install_campus_maintenance.ps1 -Mode Uninstall -Logon S4U`，再以同一 Windows 用户运行 `install_desktop.ps1 -Mode Uninstall`，从托盘退出。发行包内两份脚本在 `app/`；旧版在解压根目录。不要从另一个安装目录卸载。停用不会删除账号或主动下线。

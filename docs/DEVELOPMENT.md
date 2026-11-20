@@ -45,7 +45,7 @@ flowchart LR
 .\.venv\Scripts\python.exe -X utf8 tests/e2e_desktop.py --exe runtime/desktop/CampusGuardian.exe --output runtime/desktop-e2e
 ```
 
-打包时先提交公开源码、重新构建，再运行 `python scripts/package.py --version 0.2.0`。输出 Windows ZIP 和 SHA-256；随包的 `licenses/` 记录 .NET 和 WebView2 SDK 的原始许可。
+打包时先提交公开源码、重新构建，再运行 `python scripts/package.py --version 0.2.1`。输出 Windows ZIP 和 SHA-256；随包的 `licenses/` 记录 .NET 和 WebView2 SDK 的原始许可。
 
 README 的媒体取自同一次回环演练。GIF 依次展示首次填号、模拟接入 SUSE、外网验证、保留其他 Wi‑Fi、账号管理和日志；Wi‑Fi 状态和门户均为模拟。PNG 来自实际桌面窗口，终端图取自真实演练输出。提交 issue 时仅附不含身份的结果代码与复现情况。
 

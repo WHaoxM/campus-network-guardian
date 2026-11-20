@@ -13,7 +13,7 @@ PUBLIC_FILES = {
     "suse.cmd": "suse.cmd", "README.md": "README.md", "LICENSE": "LICENSE",
     "docs/media/icon.png": "app/media/icon.png",
     "docs/media/desktop-flow.gif": "app/media/desktop-flow.gif",
-    **{name: f"app/{name}" for name in (
+    **{f"app/{name}": f"app/{name}" for name in (
         "setup.ps1", "scripts/suse.ps1", "requirements.txt",
         "browser_login.py", "campus_maintenance.py", "campus_accounts.py", "campus_status.py", "campus_log.py",
         "network_diagnostics.ps1", "enable_guardian.ps1", "install_campus_maintenance.ps1", "install_desktop.ps1",
@@ -39,6 +39,7 @@ def git(root, *args):
 def main():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("--version", required=True)
+    parser.add_argument("--output-dir", type=Path, help="Optional output directory under runtime/.")
     args = parser.parse_args()
     if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", args.version):
         parser.error("version must be a plain x.y.z")
@@ -48,10 +49,10 @@ def main():
     if git(root, "status", "--porcelain"):
         raise SystemExit("Commit the exact public source before building its release archive.")
 
-    build = root / "runtime/desktop"
+    build = root / "app/runtime/desktop"
     exe = build / "CampusGuardian.exe"
     if not exe.is_file():
-        raise SystemExit("Run build_desktop.ps1 before packaging.")
+        raise SystemExit("Run scripts/build_desktop.ps1 before packaging.")
     metadata = json.loads((build / "CampusGuardian.deps.json").read_text(encoding="utf-8"))
     manifests = {
         "runtimepack.microsoft.netcore.app.runtime.win-x64": ("dotnet-runtime", "LICENSE.TXT"),
@@ -75,7 +76,9 @@ def main():
                 raise SystemExit(f"Missing {label} redistribution notice: {filename}")
             notices[f"app/licenses/{label}/{filename}"] = file
 
-    release = root / "runtime/release"
+    release = (root / (args.output_dir or "runtime/release")).resolve()
+    if not release.is_relative_to(root / "runtime"):
+        raise SystemExit("Zip output must stay under the repository's runtime directory.")
     release.mkdir(parents=True, exist_ok=True)
     name = f"CampusNetworkGuardian-{args.version}-win-x64"
     output = release / f"{name}.zip"

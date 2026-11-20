@@ -8,6 +8,15 @@
 /captures/
 /desktop/bin/
 /desktop/obj/
+/app/.env
+/app/.env.*
+!/app/.env.example
+/app/.venv/
+/app/config/browser_python.txt
+/app/config/browser_login.toml
+/app/runtime/
+/app/desktop/bin/
+/app/desktop/obj/
 __pycache__/
 .pytest_cache/
 *.har

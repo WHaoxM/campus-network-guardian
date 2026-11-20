@@ -18,7 +18,7 @@ def main():
         raise SystemExit("Media requires a successful, isolated demo.")
     out = args.output or root / "docs/media"
     out.mkdir(parents=True, exist_ok=True)
-    with Image.open(root / "desktop/assets/campus-guardian.ico") as file:
+    with Image.open(root / "app/desktop/assets/campus-guardian.ico") as file:
         file.ico.getimage((64, 64)).save(out / "icon.png")
 
     captions = (

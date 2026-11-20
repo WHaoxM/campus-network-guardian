@@ -134,7 +134,7 @@
   const dialog = byId("account-dialog");
   let rows = [], inFlight = "", target = null, editAction = "add";
   const feedback = {
-    setup_required: "请先运行安装说明里的 setup.ps1，再重新打开程序。",
+    setup_required: "请从解压目录运行 suse.cmd 完成环境准备。",
     credentials_format: "旧账号配置格式有误，未改动任何账号。请先修正旧配置。",
     account_fields: "请输入有效的校园网账号和密码。",
     account_duplicate: "这个账号已经在列表里了。",

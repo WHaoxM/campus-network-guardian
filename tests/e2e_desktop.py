@@ -123,7 +123,7 @@ def attach(browser_type, endpoint, already_up):
 
 
 def run(exe, output, preview):
-    project = Path(__file__).resolve().parents[1]
+    project = Path(__file__).resolve().parents[1] / "app"
     output.mkdir(parents=True, exist_ok=True)
     data = Path(__file__).parent / "data"
     spec = json.loads((data / "browser_journey.json").read_text(encoding="utf-8"))

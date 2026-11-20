@@ -136,7 +136,10 @@ def main():
                     if "pool_size" in step:
                         campus_path.write_text(campus + "".join(blocks[:step["pool_size"]]), encoding="utf-8")
                     def set_now(at):
-                        fixture.write_text(json.dumps({"now": at, "wifi": step.get("wifi", "campus")}), encoding="utf-8")
+                        fixture.write_text(json.dumps({"now": at, "wifi": step.get("wifi", "campus"),
+                            "nearby_suse": step.get("nearby_suse"), "dns": step.get("dns"),
+                            "wifi_status_unavailable": at == step.get("actuate_at") and step.get("link_loses_state", False)}),
+                            encoding="utf-8")
                     set_now(step["at"])
                     state["on_form"] = (lambda: set_now(step["actuate_at"])) if "actuate_at" in step else None
                     if "online" in step:
@@ -152,6 +155,8 @@ def main():
                     if "account" in step and actual.get("last_success") != step["account"]:
                         wrong = True
                     if "attempts" in step and [[a["alias"], a["result"]] for a in actual["attempts"]] != step["attempts"]:
+                        wrong = True
+                    if "attempt_reason" in step and [a["result"] for a in actual["attempts"]] != [step["attempt_reason"]]:
                         wrong = True
                     if "cooldown" in step and step["cooldown"] not in actual["cooldown"]:
                         wrong = True

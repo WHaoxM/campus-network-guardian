@@ -12,7 +12,13 @@ poll_seconds = 10
 failure_rounds = 3
 cooldown_seconds = 600
 backoff_seconds = [30, 60, 120, 240, 300]
-join_retry_seconds = 60
+join_retry_seconds = 30
+join_poll_seconds = 2
+join_scan_retry_seconds = 5
+
+[diagnostics]
+# Read-only Windows DNS comparison, only after a network-like auth failure.
+dns_timeout_seconds = 8
 
 [windows]
 netsh = "netsh.exe"

@@ -64,6 +64,10 @@ def read_config(path):
     if len(policy["windows"]) != 7 or not policy["backoff_seconds"]:
         raise Stop("invalid_schedule")
     timings = [policy[k] for k in ("poll_seconds", "failure_rounds", "cooldown_seconds", "join_retry_seconds")]
+    timings.extend(policy[k] for k in ("join_poll_seconds", "join_scan_retry_seconds") if k in policy)
+    dns_timeout = cfg.get("diagnostics", {}).get("dns_timeout_seconds")
+    if dns_timeout is not None and (type(dns_timeout) is not int or not 1 <= dns_timeout <= 15):
+        raise Stop("invalid_dns_timeout")
     if any(type(n) is not int or n <= 0 for n in [*timings, *policy["backoff_seconds"]]):
         raise Stop("invalid_retry_policy")
     windows = [tuple(time.fromisoformat(part) for part in x.split("-")) for x in policy["windows"]]
@@ -106,6 +110,41 @@ def wlan_source(guid, powershell):
                 found.append(str(ip))
         return found[0] if len(found) == 1 else None
     except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+
+
+def wlan_visible(netsh, ssid):
+    """Return None when Windows hides the scan or its result is inconclusive."""
+    try:
+        data = subprocess.check_output(
+            [netsh, "wlan", "show", "networks"], timeout=5, stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        ).decode("oem", errors="replace")
+    except (OSError, subprocess.SubprocessError):
+        return None
+    names = set(re.findall(r"(?m)^[ \t]*SSID[ \t]+[0-9]+[ \t]*:[ \t]*([^\r\n]*)", data))
+    return ssid in {name.strip() for name in names} if names else None
+
+
+def windows_dns_signals(cfg, guid):
+    timeout = cfg.get("diagnostics", {}).get("dns_timeout_seconds")
+    if not timeout:
+        return None
+    hosts = list(dict.fromkeys(urlsplit(p["url"]).hostname for p in cfg["browser_settings"]["network"]["probes"]))
+    hosts = [h for h in hosts if h and re.fullmatch(r"[a-z0-9][a-z0-9.-]{0,252}", h)
+             and not re.fullmatch(r"[0-9.]+", h)][:2]
+    if not hosts:
+        return None
+    script = Path(__file__).with_name("network_diagnostics.ps1")
+    try:
+        raw = subprocess.check_output(
+            [cfg["windows"]["powershell"], "-NoLogo", "-NoProfile", "-NonInteractive",
+             "-ExecutionPolicy", "Bypass", "-File", str(script), "-WifiGuid", guid, "-ProbeHosts", ",".join(hosts)],
+            timeout=timeout, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else None
+    except (OSError, ValueError, subprocess.SubprocessError):
         return None
 
 
@@ -184,9 +223,16 @@ class Controller:
     def window(self):
         return allowed_window(self.now(), self.cfg["windows_by_day"])
 
-    def sleep_seconds(self, elapsed):
+    def sleep_seconds(self, elapsed, outcome):
         now = self.now()
-        until = max(0.1, self.policy["poll_seconds"] - elapsed)
+        poll = self.policy["poll_seconds"]
+        if outcome == "suse_not_visible":
+            poll = min(poll, self.policy.get("join_scan_retry_seconds", poll))
+        if outcome in {"wifi_join_requested", "wifi_join_requested_fixture", "wifi_waiting",
+                       "suse_address_not_ready", "wifi_recheck_pending", "wifi_status_unavailable"}:
+            # Check association/DHCP sooner; netsh reconnection itself remains throttled.
+            poll = min(poll, self.policy.get("join_poll_seconds", poll))
+        until = max(0.1, poll - elapsed)
         for day in (now.date() - timedelta(days=1), now.date(), now.date() + timedelta(days=1)):
             start, end = self.cfg["windows_by_day"][day.weekday()]
             begin = datetime.combine(day, start, ZONE)
@@ -276,7 +322,10 @@ class Controller:
 
     def wifi(self):
         if self.fixture_file:
-            wifi = self.scenario()["wifi"]
+            scenario = self.scenario()
+            if scenario.get("wifi_status_unavailable"):
+                raise Stop("wifi_status_unavailable")
+            wifi = scenario["wifi"]
             return [{"ssid": self.ssid if wifi == "campus" else "different" if wifi == "other" else None, "guid": "rehearsal"}]
         return wlan_interfaces()
 
@@ -300,10 +349,22 @@ class Controller:
             if self.desktop_paused():
                 raise Stop("pause_gate_wait")
 
+    def diagnose_dns(self, guid, reason):
+        if reason not in {"browser_portal_unavailable", "browser_dns_resolution_failed", "browser_proxy_unavailable",
+                          "browser_navigation_failed", "browser_form_not_found", "browser_relay_did_not_finish",
+                          "browser_login_not_verified", "browser_login_request_not_observed"}:
+            return None
+        signals = self.scenario().get("dns") if self.fixture_file else windows_dns_signals(self.cfg, guid)
+        if not isinstance(signals, dict) or signals.get("system") is not False:
+            return None
+        if signals.get("wifi") is True:
+            return "vpn_dns_suspected" if signals.get("vpn") is True else "dns_configuration_suspected"
+        return "dns_resolution_unavailable"
+
     def connect_saved(self, entries, window):
         self.guard(window)
         fresh = self.wifi()
-        if len(entries) != 1 or len(fresh) != 1 or any(i["ssid"] for i in fresh):
+        if len(entries) != 1 or len(fresh) != 1 or fresh[0]["guid"] != entries[0]["guid"] or fresh[0]["ssid"]:
             return "wifi_join_deferred"
         self.guard(window)
         if self.fixture_file:
@@ -323,7 +384,8 @@ class Controller:
         self.event("retry_scheduled", retry_at=s["next_attempt"])
 
     def mark_online(self, s):
-        s.update(was_online=True, observed=True, failures=0, next_attempt=0, backoff_step=0, rotate_after=None)
+        s.update(was_online=True, observed=True, failures=0, next_attempt=0, backoff_step=0,
+                 rotate_after=None, link_recheck_streak=0)
 
     def attempt(self, account, window, guid, probe):
         self.guard(window, guid)
@@ -362,7 +424,8 @@ class Controller:
             s.update(failures=0, observed=False, was_online=False)
             return self.finish(s, "pause_gate_wait", [])
         if s["window"] != window:
-            s.update(window=window, failures=0, observed=False, was_online=False, next_attempt=0, backoff_step=0, rotate_after=None)
+            s.update(window=window, failures=0, observed=False, was_online=False,
+                     next_attempt=0, backoff_step=0, rotate_after=None, link_recheck_streak=0)
             self.event("window_open")
         s["cooldown"] = {a: n for a, n in s["cooldown"].items() if n > now}
         try:
@@ -380,7 +443,14 @@ class Controller:
                 return self.finish(s, "different_or_ambiguous_wifi", [])
             if online(net):
                 return self.finish(s, "other_network_online", [])
+            if len(entries) != 1:
+                return self.finish(s, "different_or_ambiguous_wifi", [])
             if now >= s["next_join"]:
+                visible = (self.scenario().get("nearby_suse") if self.fixture_file
+                           else wlan_visible(self.cfg["windows"]["netsh"], self.ssid))
+                if visible is False:
+                    s["next_join"] = now + self.policy.get("join_scan_retry_seconds", self.policy["poll_seconds"])
+                    return self.finish(s, "suse_not_visible", [])
                 s["next_join"] = now + self.policy["join_retry_seconds"]
                 if self.desktop_status:
                     self.desktop_status.publish("joining")
@@ -447,6 +517,14 @@ class Controller:
             if reason == "pause_gate_wait":
                 return self.finish(s, reason, attempts)
             self.event(reason, kind="attempt_result", alias=account["alias"], submissions=result["submissions"])
+            if not result["submissions"] and reason in {"wifi_status_unavailable", "wifi_changed_before_submit", "wifi_not_connected"}:
+                # Windows can briefly lose the link state during association.
+                # No account was submitted; recheck the link without auth backoff.
+                s["link_recheck_streak"] = min(s.get("link_recheck_streak", 0) + 1, 2)
+                retry_at = self.now().timestamp() + self.policy["join_retry_seconds"] if s["link_recheck_streak"] > 1 else 0
+                s.update(next_attempt=retry_at, failures=0, observed=False)
+                return self.finish(s, "wifi_recheck_pending", attempts)
+            s["link_recheck_streak"] = 0
             if reason in {"browser_login_verified", "already_online"}:
                 self.mark_online(s)
                 if reason == "browser_login_verified":
@@ -459,10 +537,13 @@ class Controller:
             if reason == "credential_rejected":
                 self.disabled.add(account["alias"])
                 continue
-            # Portal unavailable, unknown failure, CAPTCHA or gate change:
-            # stop the whole round rather than submitting other accounts.
+            # Stop the whole round on network-like failures. Diagnose once,
+            # without treating a transport or DNS failure as a bad password.
+            diagnostic = self.diagnose_dns(guid, reason)
+            if diagnostic and s["outcome"] != diagnostic:
+                self.event(diagnostic)
             self.backoff(s)
-            return self.finish(s, reason, attempts)
+            return self.finish(s, diagnostic or reason, attempts)
         self.backoff(s)
         return self.finish(s, "no_accepted_account", attempts)
 
@@ -543,7 +624,7 @@ def main():
                     if args.mode == "tick":
                         print(json.dumps(s, ensure_ascii=False))
                         break
-                    clock.sleep(ctl.sleep_seconds(clock.monotonic() - started))
+                    clock.sleep(ctl.sleep_seconds(clock.monotonic() - started, s["outcome"]))
     except KeyboardInterrupt:
         return 0
     except Stop as exc:

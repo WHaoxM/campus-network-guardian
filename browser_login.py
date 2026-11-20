@@ -139,6 +139,7 @@ class BrowserLogin:
         self.submit_frame = None
         self.credential_phase = False
         self.before_submit = before_submit
+        self.navigation_failure = None
 
     def is_auth_url(self, url):
         p = urlsplit(url)
@@ -204,7 +205,27 @@ class BrowserLogin:
         finally:
             response.dispose()
 
+    def login_document(self, url):
+        return (url == self.b["entry_url"] or self.is_auth_url(url)
+                or origin(url) in self.b["http_relay_origins"])
+
+    def failed_document(self, request):
+        if self.credential_phase or request.resource_type != "document" or not self.login_document(request.url):
+            return
+        failure = request.failure or ""
+        if "ERR_NAME_NOT_RESOLVED" in failure:
+            self.navigation_failure = "browser_dns_resolution_failed"
+        elif any(code in failure for code in ("ERR_PROXY_CONNECTION_FAILED", "ERR_TUNNEL_CONNECTION_FAILED",
+                                                "ERR_NO_SUPPORTED_PROXIES")):
+            self.navigation_failure = "browser_proxy_unavailable"
+        elif any(code in failure for code in ("ERR_ADDRESS_UNREACHABLE", "ERR_CONNECTION_REFUSED",
+                                                "ERR_INTERNET_DISCONNECTED")):
+            self.navigation_failure = "browser_navigation_failed"
+
     def remember_document(self, response):
+        if (not self.credential_phase and response.request.resource_type == "document"
+                and self.login_document(response.url) and response.status >= 500):
+            self.navigation_failure = "browser_portal_unavailable"
         if response.request.resource_type == "document" and len(self.report["documents"]) < 20:
             p = urlsplit(response.url)
             known_paths = {"/", self.b["auth_path"], self.b["success_path"], *self.b["diagnostic_paths"]}
@@ -224,12 +245,15 @@ class BrowserLogin:
         return frame.locator(selector).count() == 1 and frame.locator(selector).is_visible()
 
     def find_form(self, context, page):
+        budget = self.b["navigation_timeout_seconds"]
+        end = time.monotonic() + budget
         try:
-            page.goto(self.b["entry_url"], wait_until="commit")
+            page.goto(self.b["entry_url"], wait_until="commit", timeout=budget * 1000)
         except Error:
             # A full navigation can be interrupted by another portal navigation.
             pass
-        end = time.monotonic() + self.b["navigation_timeout_seconds"]
+        if self.navigation_failure:
+            raise Stop(self.navigation_failure)
         while time.monotonic() < end:
             for tab in context.pages:
                 for frame in tab.frames:
@@ -242,9 +266,13 @@ class BrowserLogin:
                             return frame
                     except Error:
                         continue
+            if self.navigation_failure:
+                raise Stop(self.navigation_failure)
             if page.is_closed():
                 break
             page.wait_for_timeout(150)
+        if self.navigation_failure:
+            raise Stop(self.navigation_failure)
         if self.report.get("redirect_to_intermediate"):
             raise Stop("browser_relay_did_not_finish")
         raise Stop("browser_form_not_found")
@@ -334,6 +362,10 @@ class BrowserLogin:
                     for f in page.frames
                 )
                 break
+            if self.report.get("submission_blocked"):
+                return self.report["submission_blocked"]
+            if self.report.get("credential_rejected"):
+                return "credential_rejected"
             if (probe or (lambda: online(network)))():
                 self.report["network_online"] = True
             if self.report["network_online"] and self.report["success_page"] and self.report["login_submissions"]:
@@ -546,6 +578,7 @@ def run(args, cfg, config_path, root, report, *, account=None, login_guard=None,
                 context.route_web_socket("**/*", lambda socket: socket.close())
                 context.route("**/*", flow.route)
                 context.on("response", flow.remember_document)
+                context.on("requestfailed", flow.failed_document)
                 if args.mode == "check":
                     return "browser_ready"
                 page = context.pages[0] if context.pages else context.new_page()

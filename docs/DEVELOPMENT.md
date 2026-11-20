@@ -8,6 +8,7 @@
 | `campus_accounts.py` / `desktop/AccountService.cs` | 仅本地设置账号、显示尾号、衔接启动任务 |
 | `enable_guardian.ps1` | 通过 Windows 授权安装并启动同一用户的 S4U 任务 |
 | `browser_login.py` | 隔离 Edge 上的正常门户登录与外网复核 |
+| `network_diagnostics.ps1` | 认证遇到网络错误后的限时只读 DNS 对照，只回传结果布尔值 |
 | `tests/` | 仅回环门户和部署产物的端到端演练 |
 
 守护器按现有 Wi-Fi 和外网状态决定是否恢复。桌面账号表单通过 WebView2 的本地消息和子进程 stdin 保存，列表只回传尾号。首次设置调用 Windows 授权；任务确认启动后才安装托盘启动项，不要求先完成校园网认证。暂停仍由守护器执行并确认。

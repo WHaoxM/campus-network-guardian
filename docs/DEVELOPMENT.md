@@ -51,7 +51,7 @@ flowchart LR
 .\.venv\Scripts\python.exe -X utf8 tests/e2e_distribution.py --zip runtime/release/CampusNetworkGuardian-0.2.2-win-x64.zip --output runtime/distribution-e2e
 ```
 
-README 的媒体取自同一次回环演练。GIF 依次展示首次填号、模拟接入 SUSE、外网验证、保留其他 Wi‑Fi、账号管理和日志；Wi‑Fi 状态和门户均为模拟。PNG 来自实际桌面窗口，终端图取自真实演练输出。提交 issue 时仅附不含身份的结果代码与复现情况。
+`docs/media/` 只保留 README 用到的 GIF 和图标；逐帧截图与演练报告留在本机 `runtime/`，不提交。`scripts/render_demo.py` 从回环演练的真实窗口截图生成 GIF；Wi‑Fi 状态和门户均为模拟。提交 issue 时仅附不含身份的结果代码与复现情况。
 
 README 的呈现参考了 [Arcane](https://github.com/getarcaneapp/arcane#readme) 的首屏实物图、[uv](https://github.com/astral-sh/uv#readme) 的可复制命令与输出、[江山时序](https://github.com/DeanChensj/jiangshan-map/blob/main/README_ZH.md) 的短演示与真实使用场景。未复用这些项目的代码、图片或标识。
 

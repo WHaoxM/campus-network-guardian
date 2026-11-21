@@ -48,10 +48,11 @@ function Get-OwnedTask([string]$Name, [string[]]$Interpreters) {
     return $existing
 }
 
-function Wait-TaskStopped([string]$Name) {
+function Wait-TaskStopped([string]$Name, $PreviousProcess) {
     $end = [DateTime]::UtcNow.AddSeconds(16)
     do {
-        if ((Get-ScheduledTask -TaskName $Name -TaskPath '\').State -ne 'Running') { return }
+        if ((Get-ScheduledTask -TaskName $Name -TaskPath '\').State -ne 'Running' -and
+            (!$PreviousProcess -or $PreviousProcess.HasExited)) { return }
         Start-Sleep -Milliseconds 200
     } while ([DateTime]::UtcNow -lt $end)
     throw '原守护进程未退出，未切换到新版。'
@@ -144,6 +145,7 @@ $rebound = $false
 $newWatcher = $false
 $newDesktop = $null
 $oldAction = if ($task) { $task.Actions[0] } else { $null }
+$oldWatcher = $null
 $shouldRestart = $task -and $task.State -ne 'Disabled'
 $oldDesktop = $false
 $legacyMarker = if (Test-Path -LiteralPath $marker -PathType Leaf) { [IO.File]::ReadAllText($marker).Trim() } else { '' }
@@ -195,13 +197,23 @@ try {
     }
 
     if ($task) {
-        $null = Get-OwnedTask $taskName @($oldVenv,$python)
+        $task = Get-OwnedTask $taskName @($oldVenv,$python)
+        if (!$task) { throw '升级期间原守护任务消失，未替换程序。' }
+        if ($task.State -eq 'Running') {
+            $previousStatus = Read-Json $heartbeat
+            $oldWatcher = Get-Process -Id $previousStatus.pid -ErrorAction SilentlyContinue
+            $previousAge = ([DateTimeOffset]::UtcNow - [DateTimeOffset]::Parse($previousStatus.heartbeat_at)).TotalSeconds
+            if ($previousStatus.fixture -ne $false -or $previousStatus.schema -ne 1 -or $previousAge -lt -2 -or
+                $previousAge -gt 45 -or !$oldWatcher -or $oldWatcher.Path -ne $oldAction.Execute) {
+                throw '无法确认原守护进程身份，未替换程序。'
+            }
+        }
         # Disable triggers while files are changing. An exactly owned task is
         # re-enabled only if it was enabled before the transaction.
         Disable-ScheduledTask -InputObject $task | Out-Null
         $stopped = $true
         if ($task.State -eq 'Running') { Stop-ScheduledTask -InputObject $task }
-        Wait-TaskStopped $taskName
+        Wait-TaskStopped $taskName $oldWatcher
     }
     if ($Mode -eq 'Upgrade') {
         foreach ($process in @(Get-Process -Name CampusGuardian -ErrorAction SilentlyContinue | Where-Object Path -eq $exe)) {

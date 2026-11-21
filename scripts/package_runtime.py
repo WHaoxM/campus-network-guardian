@@ -9,18 +9,24 @@ from urllib.request import urlopen
 from zipfile import ZipFile
 
 
-def _download(item):
+def _download(cache, item):
+    path = cache / item["sha256"]
+    body = path.read_bytes() if path.is_file() else b""
+    if sha256(body).hexdigest() == item["sha256"]:
+        return body
     with urlopen(item["url"], timeout=60) as response:
         body = response.read(64 * 1024 * 1024 + 1)
     if sha256(body).hexdigest() != item["sha256"]:
         raise ValueError("Upstream checksum did not match: " + item["url"])
+    path.write_bytes(body)
     return body
 
 
-def bundled_files():
+def bundled_files(cache):
     lock = json.loads(Path(__file__).with_name("runtime-win-x64.json").read_text(encoding="utf-8"))
+    cache.mkdir(parents=True, exist_ok=True)
     with ThreadPoolExecutor(max_workers=4) as executor:
-        artifacts = list(executor.map(_download, [lock["python"], *lock["wheels"]]))
+        artifacts = list(executor.map(lambda item: _download(cache, item), [lock["python"], *lock["wheels"]]))
     written = set()
     for index, artifact in enumerate(artifacts):
         with ZipFile(BytesIO(artifact)) as archive:
@@ -36,6 +42,8 @@ def bundled_files():
                     if len(relative.parts) > 2 and relative.parts[1] == "headers":
                         continue
                     raise ValueError(f"Wheel requires unsupported installation layout: {entry.filename}")
+                if index and relative.parts[:2] == ("greenlet", "tests"):
+                    continue
                 prefix = "app/runtime/python" + ("/site-packages" if index else "")
                 installed = f"{prefix}/{relative}"
                 if installed.casefold() in written:

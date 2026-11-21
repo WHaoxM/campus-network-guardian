@@ -117,7 +117,7 @@ def main():
                 add(f"app/runtime/desktop/{relative}", file.read_bytes())
         for filename, file in notices.items():
             add(filename, file.read_bytes())
-        for target, data in bundled_files():
+        for target, data in bundled_files(root / "runtime/package-inputs"):
             add(target, data)
         dest.writestr(f"{name}/install-manifest.json", json.dumps(
             {"schema": 1, "product": "SUSE.CampusNetworkGuardian", "version": args.version, "files": fingerprint},

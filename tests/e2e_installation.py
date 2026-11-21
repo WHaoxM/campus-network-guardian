@@ -71,6 +71,9 @@ def run(bundle, legacy, output):
         env = dict(os.environ, PATH=windows_tool(), PIP_NO_INDEX="1",
                    PYTHONHOME=str(scratch / "no-system-python"), PYTHONPATH=str(scratch / "not-importable"))
         first = scratch / "固定 安装位置"
+        retry = first / "app/runtime"
+        retry.mkdir(parents=True)
+        (retry / "install.lock").touch()
         code, message = cli(launcher, scratch, env, "install", str(first), "-NoLaunch")
         if code or (first / "app/.venv").exists() or "正在安装 Playwright" in message:
             raise RuntimeError(f"Bundled installation depended on system Python: {message[-1600:]}")
@@ -141,7 +144,12 @@ def run(bundle, legacy, output):
 
         def upgraded(page):
             expect(page.get_by_role("heading", name="暂时无法确认网络")).to_be_visible(timeout=15000)
-            expect(page.locator("#schedule-summary")).to_have_text("每周 1 天 · 北京时间")
+            expect(page.locator("#schedule-summary")).to_have_text("每周 1 天 · 北京时间 · 等待后台应用")
+            page.get_by_role("button", name="编辑时段", exact=True).click()
+            editor = page.get_by_role("dialog", name="守护时段")
+            expect(editor.get_by_role("textbox", name="周四开始时间")).to_have_value(start)
+            expect(editor.get_by_role("textbox", name="周四结束时间")).to_have_value(end)
+            page.get_by_role("button", name="关闭守护时段", exact=True).click()
             page.get_by_role("button", name="账号管理", exact=True).click()
             accounts = page.get_by_role("dialog", name="账号管理")
             expect(accounts.get_by_text("•••• " + auth["username"][-4:])).to_be_visible()

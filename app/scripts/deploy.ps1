@@ -16,12 +16,32 @@ $isAdmin = [Security.Principal.WindowsPrincipal]::new($identity).IsInRole([Secur
 $taskDescription = 'CampusNetwork/ManagedCampusWatcher/v1; login and recovery only; never log out.'
 
 function Assert-LocalPath([string]$Path) {
-    if ($Path -notmatch '^[A-Za-z]:\\[^\\]' -or $Path -match '[\x00-\x1f"<>|?*]') { throw '请选择本机磁盘上的普通文件夹。' }
+    if ($Path -notmatch '^[A-Za-z]:\\[^\\]' -or $Path.Substring(2).Contains(':') -or
+        $Path -match '[\x00-\x1f"<>|?*]') { throw '请选择本机磁盘上的普通文件夹。' }
     for ($p = $Path; $p; $p = Split-Path $p -Parent) {
         if ((Test-Path -LiteralPath $p) -and ((Get-Item -LiteralPath $p -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
             throw '所选目录经过链接或重解析点，未修改安装。'
         }
     }
+}
+
+function Test-FreshTarget([string]$Path) {
+    if (!(Test-Path -LiteralPath $Path)) { return $true }
+    if (!(Test-Path -LiteralPath $Path -PathType Container)) { return $false }
+    # A failed first install may leave only its lock and empty directories.
+    # Do not search a selected directory tree for other people's material.
+    foreach ($entry in @(Get-ChildItem -LiteralPath $Path -Force)) {
+        if ($entry.Name -ne 'app' -or !$entry.PSIsContainer -or ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint)) { return $false }
+        foreach ($folder in @(Get-ChildItem -LiteralPath $entry.FullName -Force)) {
+            if ($folder.Name -notin @('config','runtime','scripts') -or !$folder.PSIsContainer -or
+                ($folder.Attributes -band [IO.FileAttributes]::ReparsePoint)) { return $false }
+            foreach ($file in @(Get-ChildItem -LiteralPath $folder.FullName -Force)) {
+                if ($folder.Name -ne 'runtime' -or $file.PSIsContainer -or $file.Name -notin @('install.lock','setup.lock') -or
+                    ($file.Attributes -band [IO.FileAttributes]::ReparsePoint)) { return $false }
+            }
+        }
+    }
+    return $true
 }
 
 function Read-Json([string]$Path) { Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json }
@@ -124,7 +144,7 @@ if ($Mode -eq 'Upgrade') {
         Write-Output ("安装完成：{0}  {1}" -f $manifest.version,$target)
         return
     }
-} elseif ((Test-Path -LiteralPath $target) -and (Get-ChildItem -LiteralPath $target -Force | Select-Object -First 1)) {
+} elseif (!(Test-FreshTarget $target)) {
     throw '安装目录不是空目录。要保留原账号与设置，请选“升级原安装”。'
 }
 

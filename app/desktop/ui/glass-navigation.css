@@ -1,0 +1,12 @@
+/* Lay out the upstream component; its material, lens and keyboard behavior are unchanged. */
+.guardian-glass-navigation {
+  --glass-tab-bar-height: 41px;
+  min-inline-size: 130px;
+  margin-block: 6px;
+  justify-self: center;
+  flex: none;
+}
+
+.nav-row > .guardian-glass-navigation {
+  margin-inline-start: max(14px, calc(40 * var(--u)));
+}

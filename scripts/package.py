@@ -13,6 +13,7 @@ PUBLIC_FILES = {
     "suse.cmd": "suse.cmd", "README.md": "README.md", "LICENSE": "LICENSE",
     "docs/media/icon.png": "app/media/icon.png",
     "docs/media/desktop-flow.gif": "app/media/desktop-flow.gif",
+    "app/desktop/ui/vendor/glassy-liquid/LICENSE": "app/licenses/glassy-liquid/LICENSE.txt",
     **{f"app/{name}": f"app/{name}" for name in (
         "setup.ps1", "scripts/suse.ps1", "requirements.txt",
         "browser_login.py", "campus_maintenance.py", "campus_accounts.py", "campus_status.py", "campus_log.py", "campus_schedule.py",

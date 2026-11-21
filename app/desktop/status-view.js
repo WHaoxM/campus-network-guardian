@@ -43,7 +43,7 @@
       candidate.tabIndex = active ? 0 : -1;
       byId(candidate.getAttribute("aria-controls")).hidden = !active;
     }
-    if (focus) tab.focus();
+    if (focus) (byId(`${tab.id}-glass`) ?? tab).focus();
   }
   for (const [index, tab] of tabs.entries()) {
     tab.addEventListener("click", () => showTab(tab));

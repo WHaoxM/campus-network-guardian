@@ -1,0 +1,34 @@
+browser_config = "browser_login.linux.toml"
+runtime_dir = "../runtime/linux-campus"
+schedule_file = "schedule.json"
+
+[linux]
+backend = "networkmanager"
+interface = ""
+# Leave empty for portal login only. To enable Wi-Fi reconnection, use the
+# UUID of the already saved SUSE profile for this interface.
+profile_uuid = ""
+nmcli = "/usr/bin/nmcli"
+ip = "/usr/sbin/ip"
+
+[schedule]
+# Retry policy only. On a new installation no recovery hours are enabled.
+poll_seconds = 10
+failure_rounds = 3
+cooldown_seconds = 600
+backoff_seconds = [30, 60, 120, 240, 300]
+join_retry_seconds = 30
+join_poll_seconds = 2
+join_scan_retry_seconds = 5
+
+[logging]
+max_bytes = 262144
+backups = 3
+monitor_tail = 20
+monitor_poll_seconds = 1
+monitor_repeat_seconds = 60
+
+[[accounts]]
+alias = "primary"
+username_key = "CAMPUS_USERNAME"
+password_key = "CAMPUS_PASSWORD"

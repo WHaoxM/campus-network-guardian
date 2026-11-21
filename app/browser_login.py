@@ -4,27 +4,24 @@ from contextlib import contextmanager
 import configparser
 from datetime import datetime, timedelta, timezone
 import json
-import msvcrt
 import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
 import time
-import tomllib
 import unicodedata
 from urllib.parse import parse_qs, urljoin, urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
 from uuid import uuid4
 
+from campus_portable import Stop, acquire_lock, release_lock, tomllib
+
 try:
     from playwright.sync_api import Error, sync_playwright
 except ImportError:
     raise SystemExit("缺少 Playwright，请在联网时运行：python -m pip install playwright==1.58.0") from None
-
-
-class Stop(Exception):
-    pass
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -118,20 +115,18 @@ def online(network):
 @contextmanager
 def single_instance(runtime):
     with (runtime / "login.lock").open("a+b") as handle:
-        handle.seek(0)
         try:
-            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            acquire_lock(handle)
         except OSError:
             raise Stop("another_browser_login_running") from None
         try:
             yield
         finally:
-            handle.seek(0)
-            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            release_lock(handle)
 
 
 class BrowserLogin:
-    def __init__(self, browser, report, before_submit=None):
+    def __init__(self, browser, report, before_submit=None, request_guard=None):
         self.b = browser
         self.s = browser["selectors"]
         self.report = report
@@ -139,6 +134,7 @@ class BrowserLogin:
         self.submit_frame = None
         self.credential_phase = False
         self.before_submit = before_submit
+        self.request_guard = request_guard
         self.navigation_failure = None
 
     def is_auth_url(self, url):
@@ -158,6 +154,13 @@ class BrowserLogin:
             # Relay is navigation only, never used to submit data or post-auth.
             if self.credential_phase or r.method != "GET" or not r.is_navigation_request():
                 return route.abort()
+        if self.request_guard:
+            try:
+                self.request_guard(r.url)
+            except Stop as exc:
+                self.navigation_failure = str(exc)
+                self.report["submission_blocked"] = str(exc)
+                return route.abort()
         if p.path in self.b["metadata_paths"] or p.path == self.b["login_path"]:
             if host != self.b["portal_origin"] or len(method) != 1:
                 return route.abort()
@@ -167,6 +170,8 @@ class BrowserLogin:
                         if r.frame == self.submit_frame and self.is_auth_url(r.frame.url):
                             if self.before_submit:
                                 self.before_submit()
+                            if self.request_guard:
+                                self.request_guard(r.url)
                             self.report["login_submissions"] = 1
                             return self.post_without_redirect(route, classify_login=True)
                     except Stop as exc:
@@ -525,9 +530,12 @@ def validate_config(cfg):
 
 
 @contextmanager
-def temporary_browser_environment(tmp):
+def temporary_browser_environment(tmp, *, direct=False):
     values = dict.fromkeys(("TMP", "TEMP", "TMPDIR"), str(tmp))
     values.update(dict.fromkeys(("DEBUG", "DEBUG_FILE", "PWDEBUG")))
+    if direct:
+        values.update(dict.fromkeys(k for k in os.environ if k.lower() in
+                                    {"http_proxy", "https_proxy", "all_proxy", "no_proxy"}))
     saved = {key: os.environ.get(key) for key in values}
     def apply(env):
         for key, value in env.items():
@@ -542,36 +550,45 @@ def temporary_browser_environment(tmp):
         apply(saved)
 
 
-def run(args, cfg, config_path, root, report, *, account=None, login_guard=None, probe=None):
+def run(args, cfg, config_path, root, report, *, account=None, login_guard=None, probe=None,
+        connection_guard=None, request_guard=None):
     validate_config(cfg)
     b, net, local = (cfg[key] for key in ("browser", "network", "local"))
     fixture = cfg.get("loopback_fixture", False)
+    linux = sys.platform == "linux"
     check_online = probe or (lambda: online(net))
 
     def check_connection():
-        if not fixture and not connected_to(local["wifi_ssid"]):
+        if connection_guard:
+            connection_guard()
+        elif not fixture and not connected_to(local["wifi_ssid"]):
             raise Stop("wifi_not_connected")
 
     doing_logout = args.mode in {"logout-prepare", "logout"}
     if args.mode != "check":
+        if linux and not fixture and (args.mode != "login" or not connection_guard or not request_guard):
+            raise Stop("linux_requires_maintenance")
         check_connection()
         if not doing_logout and check_online():
             report["network_online"] = True
             return "already_online"
     if args.mode == "login" and account is None:
         account = credentials(config_path.parent / local["credential_file"])
-    flow = BrowserLogout(b, report, args.mode == "logout-prepare", check_connection) if doing_logout else BrowserLogin(b, report, login_guard)
+    flow = (BrowserLogout(b, report, args.mode == "logout-prepare", check_connection) if doing_logout
+            else BrowserLogin(b, report, login_guard, request_guard))
     # Keep temporary Playwright profiles on the project volume, not a daily profile.
-    with tempfile.TemporaryDirectory(prefix="edge-", dir=root) as tmp, temporary_browser_environment(tmp):
+    with tempfile.TemporaryDirectory(prefix="chromium-" if linux else "edge-", dir=root) as tmp, \
+            temporary_browser_environment(tmp, direct=linux):
         with sync_playwright() as pw:
             data = Path(tmp) / "profile"
             data.mkdir()
             seed_http_relay_permissions(data, b["http_relay_origins"], b["navigation_timeout_seconds"] + 60)
             context = pw.chromium.launch_persistent_context(
-                data, channel=b["channel"], headless=not args.show and (args.headless or b["headless"]),
+                data, channel=b["channel"] or None, headless=not args.show and (args.headless or b["headless"]),
                 timeout=b["timeout_seconds"] * 1000, accept_downloads=False,
                 service_workers="block", ignore_https_errors=False,
-                args=["--no-first-run", "--no-default-browser-check"],
+                chromium_sandbox=linux and not fixture,
+                args=["--no-first-run", "--no-default-browser-check", *(["--no-proxy-server"] if linux else [])],
             )
             try:
                 context.set_default_timeout(b["timeout_seconds"] * 1000)

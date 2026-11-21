@@ -69,10 +69,10 @@ def settings(source, windows=EMPTY, revision=None):
 
 
 def read_schedule(cfg):
-    snap = cfg.get("desktop_status_path")
-    if snap:
+    path = schedule_path(cfg)
+    if path:
         try:
-            with snap.with_name("schedule.json").open("rb") as file:
+            with path.open("rb") as file:
                 raw = file.read(4097)
             data = json.loads(raw) if len(raw) <= 4096 else None
             if (not isinstance(data, dict) or data.get("schema") != 1 or not valid_id(data.get("revision"))):
@@ -89,11 +89,19 @@ def read_schedule(cfg):
     return settings("unset"), EMPTY
 
 
+def schedule_path(cfg):
+    if path := cfg.get("schedule_path"):
+        return path
+    if snap := cfg.get("desktop_status_path"):
+        return snap.with_name("schedule.json")
+    return None
+
+
 def save_schedule(cfg, windows):
     parse_windows(windows)
-    snap = cfg.get("desktop_status_path")
-    if not snap or not snap.parent.is_dir():
+    path = schedule_path(cfg)
+    if not path or not path.parent.is_dir():
         raise Stop("schedule_storage_error")
     revision = uuid4().hex
-    atomic_json(snap.with_name("schedule.json"), {"schema": 1, "revision": revision, "windows": windows})
+    atomic_json(path, {"schema": 1, "revision": revision, "windows": windows})
     return settings("custom", windows, revision)

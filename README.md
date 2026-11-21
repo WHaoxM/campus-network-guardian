@@ -6,7 +6,11 @@
 
 **目前只适配四川轻化工大学 SUSE 校园网。** 原本是自己在用，开源给有同样需求的同学。
 
-## 新电脑怎么装
+## Ubuntu 22.04 服务器
+
+在 `linux` 分支使用[服务器安装说明](docs/LINUX.md)。这一版不需要桌面，使用无头 Chromium 完成 SUSE 门户认证，由 systemd 在后台运行。**Linux 没有发布安装包；下面的 Windows ZIP 不适用于 Ubuntu。**
+
+## Windows 新电脑怎么装
 
 适用 **64 位 Windows（x64）**。电脑需要 Microsoft Edge 和 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/concepts/distribution)。v0.3.0 起只下载一个 ZIP；Python 和 Playwright 已在包内，不用自己安装、改 PATH 或运行 pip。
 

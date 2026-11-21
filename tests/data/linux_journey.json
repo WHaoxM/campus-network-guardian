@@ -1,0 +1,21 @@
+{
+  "network": {
+    "interface": "wlan-test",
+    "other_interface": "eth-test",
+    "other_wifi_interface": "wifi-other",
+    "ssid": "SUSE",
+    "profile": "91924ed9-ec56-4a04-8eec-5634f33ab72b",
+    "source": "192.0.2.2",
+    "default_route": true,
+    "connected": false,
+    "other_wifi": false,
+    "wrong_portal_route": false
+  },
+  "windows": ["07:00-08:00", "off", "off", "off", "off", "off", "off"],
+  "first_tick": "2026-11-23T07:00:00+08:00",
+  "after_other_route": "2026-11-23T07:01:00+08:00",
+  "after_join": "2026-11-23T07:02:00+08:00",
+  "after_backoff": "2026-11-23T07:03:00+08:00",
+  "after_window": "2026-11-23T08:00:00+08:00",
+  "second_probe": "/online-secondary"
+}

@@ -1,4 +1,4 @@
-"""Windows campus Wi-Fi maintenance. This module never calls portal logout."""
+"""Campus Wi-Fi maintenance. This module never calls portal logout."""
 import argparse
 from datetime import datetime, timedelta, timezone
 import http.client
@@ -9,15 +9,17 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 import re
 import subprocess
+import sys
 from types import SimpleNamespace
 import time as clock
-import tomllib
 from urllib.parse import urlsplit
 
 from browser_login import Stop, online, run, single_instance, validate_config, wlan_interfaces
 from campus_accounts import load_accounts
+from campus_linux import LinuxWifi
 from campus_log import FILTERS, TEXT, date_label, safe_code, show_log
-from campus_schedule import allowed_window, boundaries, parse_windows, read_schedule
+from campus_portable import tomllib
+from campus_schedule import allowed_window, boundaries, parse_windows, read_schedule, save_schedule
 from campus_status import DesktopStatus
 
 
@@ -45,6 +47,11 @@ def read_config(path):
     cfg["browser_path"] = browser_path
     cfg["browser_settings"] = browser
     cfg["root"] = (path.parent / cfg["runtime_dir"]).resolve()
+    if "schedule_file" in cfg:
+        schedule = (cfg["root"] / cfg["schedule_file"]).resolve()
+        if schedule.parent != cfg["root"] or schedule.suffix != ".json" or schedule.name == "state.json":
+            raise Stop("schedule_storage_error")
+        cfg["schedule_path"] = schedule
     if "desktop_status_file" in cfg:
         snapshot = (cfg["root"] / cfg["desktop_status_file"]).resolve()
         if not snapshot.is_relative_to(cfg["root"]) or snapshot.suffix != ".json" or snapshot.parent == cfg["root"]:
@@ -171,6 +178,12 @@ class Controller:
             raise Stop("rehearsal_requires_isolated_loopback_config")
         self.disabled = set()
         self.ssid = self.portal["local"]["wifi_ssid"]
+        self.linux = None
+        if sys.platform == "linux" and (not fixture_file or "linux" in cfg):
+            self.linux = LinuxWifi(cfg.get("linux", {}), self.ssid)
+            if fixture_file and not all(Path(command).resolve().is_relative_to(fixture_file.resolve().parent)
+                                        for command in (self.linux.ip, self.linux.nmcli)):
+                raise Stop("rehearsal_requires_isolated_loopback_config")
         self.accounts = []
         self.sync_accounts()
         self.log = logging.getLogger(str(self.root))
@@ -302,13 +315,15 @@ class Controller:
         if self.fixture_file:
             self.status_probe(lambda: online(net))
             return
-        source = wlan_source(links[0]["guid"], self.cfg["windows"]["powershell"])
+        source = self.source(links[0]["guid"])
         if source:
             self.status_probe(lambda: wlan_online(net, source))
         else:
             self.desktop_status.internet = "unknown"
 
     def wifi(self):
+        if self.linux:
+            return self.linux.entries()
         if self.fixture_file:
             scenario = self.scenario()
             if scenario.get("wifi_status_unavailable"):
@@ -317,12 +332,18 @@ class Controller:
             return [{"ssid": self.ssid if wifi == "campus" else "different" if wifi == "other" else None, "guid": "rehearsal"}]
         return wlan_interfaces()
 
+    def source(self, guid):
+        if self.linux:
+            return self.linux.source(guid)
+        return wlan_source(guid, self.cfg["windows"]["powershell"])
+
     def observe(self):
         links = [link for link in self.wifi() if link["ssid"] == self.ssid]
-        source = wlan_source(links[0]["guid"], self.cfg["windows"]["powershell"]) if len(links) == 1 and not self.fixture_file else None
+        source = self.source(links[0]["guid"]) if len(links) == 1 and (self.linux or not self.fixture_file) else None
         net = self.portal["network"]
         return {"outcome": "observation_only", "allowed": bool(self.window()), "suse_connected": len(links) == 1,
-                "source_available": bool(source), "suse_probe_ok": wlan_online(net, source) if source else None}
+                "source_available": bool(source),
+                "suse_probe_ok": (online(net) if self.fixture_file else wlan_online(net, source)) if source else None}
 
     def guard(self, window, expected_guid=None):
         def check_schedule():
@@ -343,6 +364,8 @@ class Controller:
                 raise Stop("pause_gate_wait")
 
     def diagnose_dns(self, guid, reason):
+        if self.linux:
+            return None
         if reason not in {"browser_portal_unavailable", "browser_dns_resolution_failed", "browser_proxy_unavailable",
                           "browser_navigation_failed", "browser_form_not_found", "browser_relay_did_not_finish",
                           "browser_login_not_verified", "browser_login_request_not_observed"}:
@@ -360,6 +383,8 @@ class Controller:
         if len(entries) != 1 or len(fresh) != 1 or fresh[0]["guid"] != entries[0]["guid"] or fresh[0]["ssid"]:
             return "wifi_join_deferred"
         self.guard(window)
+        if self.linux:
+            return self.linux.connect_saved(lambda: self.guard(window))
         if self.fixture_file:
             return "wifi_join_requested_fixture"
         try:
@@ -392,7 +417,9 @@ class Controller:
         try:
             with single_instance(root):
                 result = run(args, self.portal, cpath, root, report, account=auth, probe=probe,
-                             login_guard=lambda: self.guard_account(account, window, guid))
+                             login_guard=lambda: self.guard_account(account, window, guid),
+                             connection_guard=(lambda: self.guard(window, guid)) if self.linux else None,
+                             request_guard=self.linux.require_portal_route if self.linux else None)
         except Stop as exc:
             result = str(exc)
         except Exception as exc:
@@ -443,7 +470,7 @@ class Controller:
             if len(entries) != 1:
                 return self.finish(s, "different_or_ambiguous_wifi", [])
             if now >= s["next_join"]:
-                visible = (self.scenario().get("nearby_suse") if self.fixture_file
+                visible = (self.linux.visible() if self.linux else self.scenario().get("nearby_suse") if self.fixture_file
                            else wlan_visible(self.cfg["windows"]["netsh"], self.ssid))
                 if visible is False:
                     s["next_join"] = now + self.policy.get("join_scan_retry_seconds", self.policy["poll_seconds"])
@@ -455,13 +482,13 @@ class Controller:
             return self.finish(s, "wifi_waiting", [])
 
         guid = links[0]["guid"]
-        source = wlan_source(guid, self.cfg["windows"]["powershell"]) if not self.fixture_file else None
-        if not source and not self.fixture_file:
+        source = self.source(guid) if self.linux or not self.fixture_file else None
+        if not source and (self.linux or not self.fixture_file):
             if self.desktop_status:
                 self.desktop_status.internet = "unknown"
             s["failures"] = 0
             return self.finish(s, "suse_address_not_ready", [])
-        raw_probe = (lambda: wlan_online(net, source)) if source else (lambda: online(net))
+        raw_probe = (lambda: wlan_online(net, source)) if source and not self.fixture_file else (lambda: online(net))
         probe = lambda: self.status_probe(raw_probe)
         if probe():
             self.mark_online(s)
@@ -574,19 +601,26 @@ class Controller:
 
 def main():
     p = argparse.ArgumentParser(description="校园网自动维护：只登录和恢复，不主动下线。")
-    p.add_argument("mode", choices=("status", "observe", "check", "tick", "watch", "logs"))
+    p.add_argument("mode", choices=("status", "observe", "check", "tick", "watch", "logs", "schedule"))
     p.add_argument("--config", type=Path, required=True)
     p.add_argument("--rehearsal-state", type=Path, help="仅隔离回环演练")
     p.add_argument("--follow", action="store_true", help="logs 模式：持续跟踪")
     p.add_argument("--tail", type=int, help="logs 模式：最近匹配的事件条数")
     p.add_argument("--filter", choices=FILTERS, default="important", help="logs 模式：日志过滤")
+    p.add_argument("--windows", nargs=7, metavar="WINDOW", help="schedule 模式：周一到周日；HH:MM-HH:MM 或 off")
     args = p.parse_args()
     if args.mode != "logs" and (args.follow or args.tail is not None or args.filter != "important"):
         p.error("日志选项只用于 logs")
+    if args.windows is not None and args.mode != "schedule":
+        p.error("--windows 只用于 schedule")
     try:
         ctl = Controller(read_config(args.config.resolve()), args.rehearsal_state)
         if args.mode == "logs":
             ctl.display_logs(args.filter, args.tail, args.follow)
+        elif args.mode == "schedule":
+            policy = (save_schedule(ctl.cfg, [None if item == "off" else item for item in args.windows])
+                      if args.windows is not None else read_schedule(ctl.cfg)[0])
+            print(json.dumps(policy, ensure_ascii=False))
         elif args.mode == "status":
             print(json.dumps(dict(ctl.state(), now=ctl.now().isoformat(), allowed=bool(ctl.window())),
                              ensure_ascii=False))

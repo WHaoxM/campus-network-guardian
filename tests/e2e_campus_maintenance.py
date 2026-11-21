@@ -1,4 +1,4 @@
-"""Real controller CLI + Edge + isolated portal, using a virtual wall clock."""
+"""Real controller CLI + Chromium/Edge + isolated portal, using a virtual wall clock."""
 import argparse
 import json
 from pathlib import Path
@@ -17,12 +17,15 @@ def write_browser(path, template, base, relay, spec):
     replacements = {
         "entry_url": json.dumps(base + spec["entry"]),
         "portal_origin": json.dumps(base),
-        "allowed_origins": json.dumps([base, relay]),
-        "http_relay_origins": json.dumps([relay]),
+        "allowed_origins": json.dumps([base] if relay == base else [base, relay]),
+        "http_relay_origins": json.dumps([] if relay == base else [relay]),
         "credential_file": '".env"', "runtime_dir": '"edge-runs"',
         "navigation_timeout_seconds": "2", "timeout_seconds": "5", "verify_delay_seconds": "0.2",
         "verify_attempts": "2",
     }
+    if sys.platform == "linux":
+        replacements["channel"] = '""'
+        replacements["verify_delay_seconds"] = "2"
     body = template.split("[[network.probes]]", 1)[0]
     for key, v in replacements.items():
         body = re.sub(r"(?m)^" + key + r"\s*=.*$", lambda _: key + " = " + v, body)

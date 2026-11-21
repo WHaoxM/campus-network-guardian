@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+export PYTHONDONTWRITEBYTECODE=1
+root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+app="$root/app"
+runtime="$app/runtime"
+venv="$runtime/linux-env"
+export PLAYWRIGHT_BROWSERS_PATH="$runtime/linux-chromium"
+config="$app/config/campus.linux.toml"
+browser="$app/config/browser_login.linux.toml"
+
+case "${1:-help}" in
+    setup)
+        if (( $# != 1 )); then
+            echo '用法：./suse-linux setup' >&2
+            exit 2
+        fi
+        if (( EUID == 0 )); then
+            echo '请使用运行守护的普通用户执行 setup，不要使用 sudo。' >&2
+            exit 2
+        fi
+        mkdir -p -- "$runtime"
+        if [[ ! -x "$venv/bin/python" ]]; then
+            python3 -m venv "$venv"
+        fi
+        "$venv/bin/python" -m pip install --disable-pip-version-check --no-cache-dir -r "$app/requirements-linux.txt"
+        "$venv/bin/python" -m playwright install --only-shell chromium
+        [[ -e "$config" ]] || cp -- "$app/config/campus.linux.example.toml" "$config"
+        if [[ ! -e "$browser" ]]; then
+            sed -e 's/^channel = "msedge"$/channel = ""/' \
+                -e 's@^runtime_dir = "../runtime/browser-login"$@runtime_dir = "../runtime/linux-browser-runs"@' \
+                "$app/config/browser_login.example.toml" > "$browser"
+        fi
+        [[ -e "$app/.env" ]] || cp -- "$app/.env.example" "$app/.env"
+        printf '%s\n' '环境已准备好。先填写 app/config/campus.linux.toml 的网卡和 app/.env，再设置时段。'
+        ;;
+    check|status|observe|tick|watch|logs|schedule)
+        mode=$1
+        shift
+        if [[ ! -x "$venv/bin/python" || ! -f "$config" ]]; then
+            echo '请先运行 ./suse-linux setup。' >&2
+            exit 2
+        fi
+        if (( EUID == 0 )); then
+            echo '请使用运行守护的普通用户，不要使用 sudo。' >&2
+            exit 2
+        fi
+        exec "$venv/bin/python" -X utf8 "$app/campus_maintenance.py" "$mode" "$@" --config "$config"
+        ;;
+    help|-h|--help)
+        printf '%s\n' '用法：./suse-linux {setup|check|status|observe|tick|watch|logs|schedule}' \
+            '时段：./suse-linux schedule --windows <周一> <周二> <周三> <周四> <周五> <周六> <周日>' \
+            '日期使用 HH:MM-HH:MM 或 off；详细步骤见 docs/LINUX.md。'
+        ;;
+    *)
+        echo '未知命令。运行 ./suse-linux --help 查看用法。' >&2
+        exit 2
+        ;;
+esac

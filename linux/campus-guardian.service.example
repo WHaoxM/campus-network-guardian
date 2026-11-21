@@ -1,0 +1,16 @@
+[Unit]
+Description=SUSE Campus Network Guardian
+Wants=NetworkManager.service
+After=NetworkManager.service
+
+[Service]
+Type=simple
+User=@USER@
+WorkingDirectory=@PROJECT@
+ExecStart="@PROJECT@/suse-linux" watch
+Restart=on-failure
+RestartSec=15s
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

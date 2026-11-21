@@ -110,3 +110,38 @@ README 的呈现参考了 [Arcane](https://github.com/getarcaneapp/arcane#readme
 ## 停用与卸载
 
 在现有安装目录操作。用管理员 PowerShell 运行运行目录里的 `install_campus_maintenance.ps1 -Mode Uninstall -Logon S4U`，再以同一 Windows 用户运行 `install_desktop.ps1 -Mode Uninstall`，从托盘退出。发行包内两份脚本在 `app/`；旧版在解压根目录。不要从另一个安装目录卸载。停用不会删除账号或主动下线。
+## Linux 分支：Ubuntu 22.04 运行路径
+
+安装入口和操作见 [Linux 安装说明](LINUX.md)。Windows 打包清单仍纳入两个共用模块，Windows 的启动入口和发布物不变。
+
+```text
+suse-linux                          安装、状态、时段、守护入口
+app/config/campus.linux.example.toml Linux 网卡和重试策略
+app/campus_portable.py               平台锁和 TOML
+app/campus_linux.py                  NetworkManager / iproute2
+app/campus_maintenance.py            共用调度、状态、日志与门禁
+app/browser_login.py                 共用门户表单；Linux 增加路由门禁
+linux/campus-guardian.service.example 普通用户 systemd 模板
+tests/e2e_linux_guardian.py           Linux CLI → Chromium → 测试门户
+```
+
+```mermaid
+flowchart LR
+  A[suse-linux / systemd] --> B[守护控制器]
+  C[用户时段和账号配置] --> B
+  D[NetworkManager 与 iproute2] --> B
+  B --> E[无头 Chromium]
+  E --> F[只访问配置的门户]
+  B --> G[本地状态和轮转日志]
+```
+
+```mermaid
+flowchart LR
+  A[读时段] --> B[读 Wi-Fi]
+  B --> C{SUSE 已连接?}
+  C -- 否 --> D[没有其他可用网络才请求保存的配置]
+  C -- 是 --> E[核对 IPv4 和探测外网]
+  E -- 探测失败 --> F[核对门户路由与表单]
+  F --> G[提交前复核时段、网卡、账号和路由]
+  G --> H[门户成功页与外网均成功才确认]
+```

@@ -8,11 +8,13 @@
 
 ## 开始使用
 
-1. [下载 Windows x64 便携包](https://github.com/WHaoxM/campus-network-guardian/releases/latest)并完整解压。准备好 64 位 Python（建议 3.13，安装时勾选 **Add Python to PATH**）、Edge 和 WebView2 Runtime。
-2. 用 Windows 手动连一次 **SUSE**，让系统记住它。双击 **`suse.cmd`**（也可在 PowerShell 运行 `.\suse.cmd`）。首次会安装项目依赖，需要联网。
+1. [下载 Windows x64 安装包](https://github.com/WHaoxM/campus-network-guardian/releases/latest)并完整解压。包内已有 Python 和 Playwright；电脑需要 Microsoft Edge 和 WebView2 Runtime。
+2. 用 Windows 手动连一次 **SUSE**。双击包里的 **`suse.cmd`**，选一个空的安装目录。以后打开安装目录里的入口，不需要自己安装 Python 或设置 PATH。
 3. 填校园网账号和密码，点 **设置时段**，选择每周哪几天守护并填写时间（北京时间）。保存后点 **保存并开启守护**，允许 Windows 权限提示。之后可以从托盘打开，在「状态 → 守护时段」随时修改。
 
 没连 Wi‑Fi、也没有外网时，守护器先连接已保存的 SUSE，再按需登录。**连着其他 Wi‑Fi 不抢占，已经联网不重登，到点也不主动下线。**
+
+从 v0.2.5 升级，运行新版包的入口并选择原安装目录，不要直接解压覆盖。
 
 ![首次设置、编辑守护时段、SUSE 自动恢复、账号管理和日志](docs/media/desktop-flow.gif)
 

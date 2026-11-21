@@ -1,9 +1,15 @@
 ﻿[CmdletBinding()]
-param([Parameter(Position=0)][string]$Action = 'open')
+param(
+    [Parameter(Position=0)][string]$Action = 'open',
+    [Parameter(Position=1)][string]$Directory,
+    [switch]$NoLaunch
+)
 
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 $root = Split-Path -Parent $PSScriptRoot
+$entryRoot = Split-Path -Parent $root
+$package = Test-Path -LiteralPath (Join-Path $entryRoot 'install-manifest.json') -PathType Leaf
 
 function Require-Browsers {
     $roots = @([Environment]::GetFolderPath('ProgramFilesX86'), [Environment]::GetFolderPath('ProgramFiles'),
@@ -34,7 +40,9 @@ function Check-InstallLocation {
     $desktop = & (Join-Path $root 'install_desktop.ps1') -Mode Status
     if ($desktop.Conflict) { throw '发现另一目录的托盘启动项，未改动现有安装。旧版不能直接覆盖升级。' }
     if ($existing) {
-        $python = Join-Path $root '.venv\Scripts\python.exe'
+        $marker = Join-Path $root 'config\browser_python.txt'
+        $python = if (Test-Path -LiteralPath $marker -PathType Leaf) { [IO.File]::ReadAllText($marker).Trim() }
+                  else { Join-Path $root 'runtime\python\python.exe' }
         $watcher = Join-Path $root 'campus_maintenance.py'
         $argsLine = '-X utf8 "{0}" watch --config "{1}"' -f $watcher, $config
         $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -50,12 +58,39 @@ function Check-InstallLocation {
     }
 }
 
+function Choose-Directory {
+    Add-Type -AssemblyName System.Windows.Forms
+    $dialog = [Windows.Forms.FolderBrowserDialog]::new()
+    try {
+        $dialog.Description = '选择一个空文件夹安装；旧用户请选择原来含 suse.cmd 的安装目录。'
+        $dialog.ShowNewFolderButton = $true
+        $dialog.SelectedPath = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Programs'
+        if ($dialog.ShowDialog() -eq [Windows.Forms.DialogResult]::OK) { return $dialog.SelectedPath }
+        return $null
+    } finally { $dialog.Dispose() }
+}
+
 try {
     if ($Action -in @('help','--help','-h','/?')) {
-        Write-Output 'suse.cmd       准备环境并打开 SUSE 校园网守护；再次运行直接打开。'
+        Write-Output 'suse.cmd                         打开守护；在解压目录打开时会选择安装位置。'
+        Write-Output 'suse.cmd install "目录"          安装到空目录。'
+        Write-Output 'suse.cmd upgrade "原安装目录"    原地升级，保留账号与时段。'
+        exit 0
+    }
+    if ($Action -eq 'open' -and $package) {
+        if (!$Directory) { $Directory = Choose-Directory }
+        if (!$Directory) { exit 0 }
+        $Action = if (Test-Path -LiteralPath (Join-Path $Directory 'app\runtime\desktop\CampusGuardian.exe') -PathType Leaf) { 'upgrade' } else { 'install' }
+    }
+    if ($Action -in @('install','upgrade')) {
+        if (!$package) { throw '请在完整解压的新版安装包里运行安装或升级。' }
+        if (!$Directory) { throw '请指定安装目录，或双击安装包里的 suse.cmd 选择。' }
+        if (!$NoLaunch) { Require-Browsers }
+        & (Join-Path $PSScriptRoot 'deploy.ps1') -Mode $Action -Directory $Directory -NoLaunch:$NoLaunch
         exit 0
     }
     if ($Action -ne 'open') { throw '未知命令。运行 suse.cmd help 查看用法。' }
+    if (Test-Path -LiteralPath (Join-Path $root 'runtime\install-transaction')) { throw '上次升级未完成，为保护旧版暂不启动。请先处理升级结果。' }
     $exe = Join-Path $root 'runtime\desktop\CampusGuardian.exe'
     if (!(Test-Path -LiteralPath $exe -PathType Leaf)) { throw '找不到桌面程序，请完整解压 Windows 便携包。' }
     Check-InstallLocation

@@ -81,13 +81,29 @@ flowchart LR
 .\app\.venv\Scripts\python.exe -X utf8 tests/e2e_desktop.py --exe app/runtime/desktop/CampusGuardian.exe --output runtime/desktop-e2e
 ```
 
-打包前先提交公开源码、重新构建，再运行 `python scripts/package.py --version 0.2.5`。ZIP 按运行文件清单生成，第三方许可在 `app/licenses/`。测试、演练与开发脚本只留源码，不随包发；发布方应从实际解压包验证入口，而不是让下载者跑测试。仅验收当前布局时，可附 `--output-dir runtime/layout-verification`，不覆盖现有发行文件。
+打包前先提交公开源码、重新构建，再运行 `python scripts/package.py --version 0.3.0`。ZIP 按运行文件清单生成，第三方许可在 `app/licenses/`。测试、演练与开发脚本只留源码，不随包发；发布方应从实际解压包验证入口，而不是让下载者跑测试。仅验收当前布局时，可附 `--output-dir runtime/layout-verification`，不覆盖现有发行文件。
 
 ```powershell
-.\app\.venv\Scripts\python.exe -X utf8 tests/e2e_distribution.py --zip runtime/release/CampusNetworkGuardian-0.2.5-win-x64.zip --output runtime/distribution-e2e
+.\app\.venv\Scripts\python.exe -X utf8 tests/e2e_installation.py --zip runtime/release/CampusNetworkGuardian-0.3.0-win-x64.zip --legacy runtime/release/CampusNetworkGuardian-0.2.5-win-x64.zip --output runtime/distribution-e2e
 ```
 
 `docs/media/` 只保留 README 用到的 GIF 和图标；逐帧截图与演练报告留在本机 `runtime/`，不提交。`scripts/render_demo.py` 从回环演练的真实窗口截图生成 GIF；Wi‑Fi 状态和门户均为模拟。提交 issue 时仅附不含身份的结果代码与复现情况。
+
+## 0.3.0 安装和升级流程
+
+- `scripts/package_runtime.py` 与 `scripts/runtime-win-x64.json` 从固定上游归档组装运行时，发布只上传一个 Windows ZIP。校验摘要仍由打包和发布端使用，不让使用者单独处理。
+- `app/scripts/deploy.ps1` 负责安装、替换、回退；`setup.ps1` 优先使用 `app/runtime/python`。对源码开发保留原来的 venv 准备方式。启用后的托盘和计划任务始终回到首次选择的路径。
+- **可替换**：清单里的脚本、桌面程序和私有 Python。**原地保留**：账号、时段、用户配置、浏览器资料和观测数据。任务启动失败回退程序和任务动作；遇到其他目录的任务不接管。中途断电后保留事务区，不猜测可删数据。
+
+```mermaid
+flowchart LR
+  A["一个安装包"] --> B["选择新目录或原安装目录"]
+  B --> C["验证、暂存、替换或回退"]
+  C --> D["固定入口＋桌面与私有 Python"]
+  C -.保留.-> E["账号、时段、用户配置"]
+  D --> F["原目录所属的 Windows 守护任务"]
+  F -- 新版心跳 --> C
+```
 
 README 的呈现参考了 [Arcane](https://github.com/getarcaneapp/arcane#readme) 的首屏实物图、[uv](https://github.com/astral-sh/uv#readme) 的可复制命令与输出、[江山时序](https://github.com/DeanChensj/jiangshan-map/blob/main/README_ZH.md) 的短演示与真实使用场景。未复用这些项目的代码、图片或标识。
 

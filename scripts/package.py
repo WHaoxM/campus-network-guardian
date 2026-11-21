@@ -8,6 +8,7 @@ import re
 import subprocess
 from zipfile import ZIP_DEFLATED, ZipFile
 
+from package_runtime import bundled_files
 
 PUBLIC_FILES = {
     "suse.cmd": "suse.cmd", "README.md": "README.md", "LICENSE": "LICENSE",
@@ -17,7 +18,7 @@ PUBLIC_FILES = {
     "app/desktop/ui/icons/lucide/LICENSE": "app/licenses/lucide/LICENSE.txt",
     "app/desktop/ui/vendor/webawesome/LICENSE": "app/licenses/webawesome-spinner/LICENSE.txt",
     **{f"app/{name}": f"app/{name}" for name in (
-        "setup.ps1", "scripts/suse.ps1", "requirements.txt",
+        "setup.ps1", "scripts/suse.ps1", "scripts/deploy.ps1", "requirements.txt",
         "browser_login.py", "campus_maintenance.py", "campus_accounts.py", "campus_status.py", "campus_log.py", "campus_schedule.py",
         "network_diagnostics.ps1", "enable_guardian.ps1", "install_campus_maintenance.ps1", "install_desktop.ps1",
         "config/browser_login.example.toml", "config/campus.toml",
@@ -88,11 +89,19 @@ def main():
     pending = output.with_suffix(".tmp")
     with ZipFile(io.BytesIO(git(root, "archive", "--format=zip", "HEAD", "--", *PUBLIC_FILES))) as source, \
             ZipFile(pending, "w", compression=ZIP_DEFLATED, compresslevel=6) as dest:
+        fingerprint = {}
+
+        def add(target, data):
+            if target in fingerprint:
+                raise SystemExit(f"Duplicate package file: {target}")
+            dest.writestr(f"{name}/{target}", data)
+            fingerprint[target] = hashlib.sha256(data).hexdigest()
+
         if {e.filename for e in source.infolist() if not e.is_dir()} != PUBLIC_FILES.keys():
             raise SystemExit("Committed runtime archive does not match its allowlist.")
         for original, target in PUBLIC_FILES.items():
             data = source.read(original)
-            dest.writestr(f"{name}/{target}", portable_readme(data) if original == "README.md" else data)
+            add(target, portable_readme(data) if original == "README.md" else data)
         for file in sorted(build.rglob("*")):
             if file.is_file() and file.suffix.lower() not in {".pdb", ".xml"}:
                 relative = PurePosixPath(file.relative_to(build).as_posix())
@@ -105,16 +114,20 @@ def main():
                     "desktop.json", "CampusGuardian.deps.json", "CampusGuardian.runtimeconfig.json",
                 }:
                     raise SystemExit(f"Unexpected desktop configuration: {relative}")
-                dest.write(file, f"{name}/app/runtime/desktop/{relative}")
+                add(f"app/runtime/desktop/{relative}", file.read_bytes())
         for filename, file in notices.items():
-            dest.write(file, f"{name}/{filename}")
+            add(filename, file.read_bytes())
+        for target, data in bundled_files():
+            add(target, data)
+        dest.writestr(f"{name}/install-manifest.json", json.dumps(
+            {"schema": 1, "product": "SUSE.CampusNetworkGuardian", "version": args.version, "files": fingerprint},
+            sort_keys=True, separators=(",", ":"),
+        ))
     pending.replace(output)
     with output.open("rb") as fd:
         digest = hashlib.file_digest(fd, "sha256").hexdigest()
-    check = output.with_suffix(".zip.sha256")
-    check.write_text(f"{digest}  {output.name}\n", encoding="ascii")
     print(output.relative_to(root).as_posix())
-    print(check.relative_to(root).as_posix())
+    print(f"SHA-256: {digest}")
 
 
 if __name__ == "__main__":

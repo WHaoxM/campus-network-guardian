@@ -6,7 +6,9 @@ $config = Join-Path $PSScriptRoot 'config'
 $requirements = Join-Path $PSScriptRoot 'requirements.txt'
 $runtime = Join-Path $PSScriptRoot 'runtime'
 $venv = Join-Path $PSScriptRoot '.venv'
-$exe = Join-Path $venv 'Scripts\python.exe'
+$embedded = Join-Path $runtime 'python\python.exe'
+$bundled = Test-Path -LiteralPath $embedded -PathType Leaf
+$exe = if ($bundled) { $embedded } else { Join-Path $venv 'Scripts\python.exe' }
 $utf8 = [Text.UTF8Encoding]::new($false)
 
 function Test-BasePython([string]$Executable, [string[]]$Prefix = @()) {
@@ -50,6 +52,9 @@ try {
 } catch [IO.IOException] { throw '另一个窗口正在准备环境，或目录不可写。请稍后重试。' }
 try {
     if (!(Test-Dependencies)) {
+        if ($bundled -or (Test-Path -LiteralPath (Join-Path (Split-Path $PSScriptRoot -Parent) 'installed.json'))) {
+            throw '本地运行环境不完整。请用同版本安装包运行升级修复，不会联网安装依赖。'
+        }
         if (!(Test-Path -LiteralPath $exe -PathType Leaf)) {
             $interpreter = Find-Python
             $prefix = $interpreter.Prefix

@@ -124,6 +124,9 @@ def run(archive_path, output):
                     "mask-image", re.compile(r"/icons/lucide/eye-off\.svg"))
                 if not (app / "licenses/lucide/LICENSE.txt").is_file():
                     raise RuntimeError("Lucide license is missing from the installed package")
+                if not (app / "licenses/webawesome-spinner/LICENSE.txt").is_file():
+                    raise RuntimeError("Spinner redistribution notices are missing from the installed package")
+                page.wait_for_function("customElements.get('wa-spinner') !== undefined")
                 checks.append("desktop_uses_existing_app_icon_and_local_licensed_icon_set")
                 expect(page.locator("#first-schedule-summary")).to_have_text("尚未设置")
                 page.get_by_role("button", name="设置时段").click()

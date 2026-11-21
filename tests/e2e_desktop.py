@@ -245,7 +245,7 @@ def run(exe, output, preview):
             for day, key in (("周四", "thursday"), ("周五", "friday")):
                 for label, value in zip(("开始", "结束"), schedule_data[key]):
                     hours.get_by_role("textbox", name=f"{day}{label}时间").fill(value)
-            expect(hours.locator(".schedule-end span:visible")).to_have_text("次日")
+            expect(hours.locator(".schedule-next:visible")).to_have_text("次日")
             select_day("周六", schedule_data["saturday_overlap"])
             save_hours.click()
             expect(schedule_note).to_contain_text("跨日时段与次日的开始时间重叠")
@@ -261,10 +261,13 @@ def run(exe, output, preview):
                 raise RuntimeError("First use created .env or attempted a portal sign-in")
             checks.append("first_launch_chooses_blank_schedule_and_saves_account_without_portal_or_legacy_file")
             heading = page.locator("#connection-heading")
+            detail = page.locator("#last-checked")
+            overview = page.locator(".overview")
+            spinner = overview.locator("wa-spinner")
             recovery = page.locator("#recovery-heading")
             guardian = page.locator("#guardian-state")
-            expect(heading).to_have_text("尚未取得守护状态")
-            expect(guardian).to_have_text("尚未收到状态")
+            expect(heading).to_have_text("暂时无法确认网络")
+            expect(guardian).to_have_text("未收到更新")
             checks.append("missing_snapshot_is_not_online")
 
             def scenario(at, wifi):
@@ -276,8 +279,9 @@ def run(exe, output, preview):
             server_state["accepted"] = True
             watcher = subprocess.Popen(cmd, creationflags=subprocess.CREATE_NO_WINDOW)
             stack.callback(stop, watcher)
-            expect(heading).to_have_text("SUSE 外网在线", timeout=10000)
+            expect(heading).to_have_text("网络正常", timeout=10000)
             expect(guardian).to_have_text("运行中")
+            expect(spinner).to_be_hidden()
             expect(recovery).to_have_text("不在自动恢复时段")
             expect(page.locator("#last-checked")).to_contain_text("06:50")
             expect(page.locator("#schedule-summary")).to_have_text("每周 2 天 · 北京时间")
@@ -346,11 +350,14 @@ def run(exe, output, preview):
             checks.append("masked_account_crud_primary_order_and_persistent_reload")
 
             scenario("2026-11-19T06:51:00+08:00", "other")
-            expect(heading).to_have_text("当前未接入 SUSE")
-            expect(page.locator("#last-checked")).to_contain_text("上次观测")
+            expect(heading).to_have_text("未连接 SUSE")
+            expect(page.locator("#last-checked")).to_have_text("当前使用的是其他网络")
             scenario("2026-11-19T06:52:00+08:00", "campus")
             server_state["accepted"] = False
-            expect(heading).to_have_text("SUSE 外网不可用")
+            expect(heading).to_have_text("暂时无法上网")
+            expect(detail).to_contain_text("Wi‑Fi 已连接到 SUSE")
+            expect(guardian).to_have_text("运行中")
+            expect(spinner).to_be_hidden()
             if server_state["submissions"] or server_state["logout_posts"]:
                 raise RuntimeError("Unexpected portal action outside allowed schedule")
             checks.append("link_and_internet_are_distinct_and_no_action_outside_window")
@@ -359,14 +366,16 @@ def run(exe, output, preview):
             scenario("2026-11-19T07:04:50+08:00", "other")
             wait_for_json(state_path, lambda state: state["outcome"] == "different_or_ambiguous_wifi",
                           10, "Other Wi-Fi was not preserved in the allowed window")
-            expect(heading).to_have_text("当前未接入 SUSE")
+            expect(heading).to_have_text("未连接 SUSE")
+            expect(detail).to_have_text("当前使用的是其他网络")
             expect(recovery).to_have_text("自动恢复已启用")
             if server_state["submissions"] or "wifi_join_requested_fixture" in (root / "watch/campus.log").read_text(encoding="utf-8"):
                 raise RuntimeError("Took over another Wi-Fi")
             page.screenshot(path=output / "desktop-other-wifi.png", animations="disabled")
 
             scenario("2026-11-19T07:05:00+08:00", "none")
-            expect(heading).to_have_text("Wi-Fi 尚未连接")
+            expect(heading).to_have_text("未连接 SUSE")
+            expect(detail).to_have_text("当前没有连接 Wi‑Fi")
             expect(page.locator("#recent-list")).to_contain_text("演练：已请求接入 SUSE")
             if server_state["submissions"] or server_state["logout_posts"]:
                 raise RuntimeError("Portal authentication was submitted before the SUSE link was ready")
@@ -377,17 +386,31 @@ def run(exe, output, preview):
             page.bring_to_front()
             scenario("2026-11-19T07:05:05+08:00", "campus")
             expect(page.locator("#recovery-detail")).to_have_text("正在验证校园网登录", timeout=15000)
+            expect(heading).to_have_text("正在验证登录")
+            expect(detail).to_have_text("已连接 SUSE，正在等待登录结果")
+            expect(spinner).to_be_visible()
+            page.wait_for_function("document.querySelector('wa-spinner')?.shadowRoot?.querySelector('[part~=spinner]')")
+            page.emulate_media(reduced_motion="reduce")
+            expect(spinner).to_be_hidden()
+            expect(heading).to_have_text("正在验证登录")
+            page.emulate_media(reduced_motion="no-preference")
+            expect(spinner).to_be_visible()
+            page.screenshot(path=output / "desktop-connection-recovering.png", animations="disabled")
             deferred_form.set()
-            expect(heading).to_have_text("SUSE 外网在线", timeout=30000)
+            expect(heading).to_have_text("网络正常", timeout=30000)
+            expect(detail).to_contain_text("已连接 SUSE")
+            expect(overview).to_have_class(re.compile(r"\bconnection-restored\b"))
+            expect(spinner).to_be_hidden()
             expect(recovery).to_have_text("自动恢复已启用")
             if server_state["submissions"] != 1 or server_state["logout_posts"] or errors:
                 raise RuntimeError(f"Unexpected fixture actions or browser exceptions: {errors}")
             page.screenshot(path=output / "desktop-online.png", animations="disabled")
             checks.append("guardian_recovery_phase_and_verified_return_to_online")
+            checks.append("live_status_uses_spinner_only_while_active_and_honors_reduced_motion")
             scenario("2026-11-19T07:05:10+08:00", "other")
-            expect(heading).to_have_text("当前未接入 SUSE")
+            expect(heading).to_have_text("未连接 SUSE")
             scenario("2026-11-19T07:05:20+08:00", "campus")
-            expect(heading).to_have_text("SUSE 外网在线")
+            expect(heading).to_have_text("网络正常")
 
             logs_tab = page.get_by_role("tab", name="日志", exact=True)
             status_tab = page.get_by_role("tab", name="状态", exact=True)
@@ -441,7 +464,7 @@ def run(exe, output, preview):
             save_hours.click()
             expect(hours).to_be_hidden()
             expect(recovery).to_have_text("自动恢复已启用")
-            expect(heading).to_have_text("SUSE 外网在线")
+            expect(heading).to_have_text("网络正常")
 
             # Repeat the held login and verify the existing pause control.
             page.bring_to_front()
@@ -454,10 +477,10 @@ def run(exe, output, preview):
             expect(button("等待守护确认")).to_be_disabled()
             deferred_form.set()
             expect(recovery).to_have_text("自动恢复已暂停", timeout=10000)
-            expect(heading).to_have_text("SUSE 外网不可用")
+            expect(heading).to_have_text("暂时无法上网")
             page.screenshot(path=output / "desktop-paused.png", animations="disabled")
             scenario("2026-11-19T07:07:00+08:00", "none")
-            expect(heading).to_have_text("Wi-Fi 尚未连接")
+            expect(heading).to_have_text("未连接 SUSE")
             current_events = (root / "watch/campus.log").read_text(encoding="utf-8")
             if server_state["submissions"] != 1 or current_events.count('"code": "wifi_join_requested_fixture"') != 1:
                 raise RuntimeError("The pause gate allowed a second portal submission or an additional Wi-Fi join")
@@ -468,7 +491,7 @@ def run(exe, output, preview):
                                       button, logs_tab, status_tab, logs, checks, server_state)
             else:
                 stop(watcher)
-                expect(heading).to_have_text("当前外网状态未知", timeout=10000)
+                expect(heading).to_have_text("暂时无法确认网络", timeout=10000)
                 checks.append("stopped_watcher_snapshot_does_not_claim_online")
     finally:
         deferred_form.set()
@@ -543,8 +566,8 @@ def check_pause_lifecycle(root, cmd, stack, watcher, scenario, page, recovery, h
     checks.append("narrow_hosted_layout")
 
     stop(watcher)
-    expect(heading).to_have_text("当前外网状态未知", timeout=7000)
-    expect(guardian).to_have_text(re.compile("^(状态已过期|守护未运行)$"), timeout=7000)
+    expect(heading).to_have_text("暂时无法确认网络", timeout=7000)
+    expect(guardian).to_have_text(re.compile("^(未收到更新|未运行)$"), timeout=7000)
     checks.append("stopped_watcher_snapshot_does_not_claim_online")
 
 

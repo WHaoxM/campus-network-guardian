@@ -1,23 +1,17 @@
 import { createScheduleEditor } from "./schedule-editor.js";
 import { focusControl } from "./glass-controls.js";
+import { createConnectionStatus } from "./connection-status.js";
 
 (() => {
   const byId = (id) => document.getElementById(id);
-  const overview = document.querySelector(".overview");
   const date = new Intl.DateTimeFormat("zh-CN", {
     timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit", hour: "2-digit",
     minute: "2-digit", hourCycle: "h23",
   });
   const time = new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
   const day = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" });
-  const links = {
-    other: "当前未接入 SUSE", disconnected: "Wi-Fi 尚未连接",
-    ambiguous: "无法确认 SUSE 接入", unknown: "尚未取得网络状态",
-  };
-  const guardians = {
-    starting: "启动中", missing: "尚未收到状态", stale: "状态已过期",
-    unavailable: "守护未运行", unconfirmed: "无法核验守护", running: "运行中", heartbeat: "心跳正常",
-  };
+  const renderConnection = createConnectionStatus((stamp) => day.format(stamp) === day.format(Date.now())
+    ? time.format(stamp) : date.format(stamp));
   byId("tab-logs").hidden = false;
   byId("pause").hidden = false;
   byId("pause").disabled = true;
@@ -95,19 +89,7 @@ import { focusControl } from "./glass-controls.js";
     renderScheduleSummary();
     const isOnline = live && probe_fresh && snapshot?.link === "suse" && snapshot?.internet === "online";
     const isOffline = live && probe_fresh && snapshot?.link === "suse" && snapshot?.internet === "offline";
-    byId("guardian-state").textContent = guardians[health] ?? guardians.missing;
-    byId("connection-heading").textContent = !live ? (health === "missing" ? "尚未取得守护状态" : "当前外网状态未知")
-      : isOnline ? "SUSE 外网在线"
-      : isOffline ? "SUSE 外网不可用"
-      : snapshot.link === "suse" ? "SUSE 已连接，外网待确认"
-      : links[snapshot.link] ?? links.unknown;
-    overview.dataset.connection = isOnline ? "online" : isOffline ? "offline" : "unknown";
-    overview.toggleAttribute("data-no-wifi", live && snapshot?.link === "none");
-    byId("guardian-state").dataset.live = String(live);
-    const checkedAt = Date.parse(snapshot?.last_check_at);
-    byId("last-checked").textContent = Number.isFinite(checkedAt)
-      ? `${live && probe_fresh ? "最近检查" : "上次观测"} ${date.format(checkedAt)}`
-      : "尚无真实外网探测";
+    renderConnection({ health, snapshot, live, probeFresh: probe_fresh, isOnline, isOffline });
     const pausedUntil = Date.parse(snapshot?.pause_until);
     const paused = live && Number.isFinite(pausedUntil) && pausedUntil > Date.now();
     byId("recovery-heading").textContent = paused ? "自动恢复已暂停"

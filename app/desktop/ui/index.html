@@ -55,15 +55,20 @@
       <div id="monitor-content">
         <section class="overview" data-connection="unknown" aria-labelledby="connection-heading">
           <div class="connection">
-            <span class="connection-icon" aria-hidden="true"><span class="ui-icon icon-wifi"></span></span>
+            <div class="connection-icon" aria-hidden="true">
+              <span class="connection-ring"></span>
+              <wa-spinner class="connection-spinner"></wa-spinner>
+              <span class="ui-icon icon-wifi"></span>
+            </div>
             <div>
-              <h1 id="connection-heading">尚未取得守护状态</h1>
-              <p id="last-checked" class="muted"></p>
+              <p id="connection-caption" class="muted">校园网络</p>
+              <h1 id="connection-heading" aria-live="polite">暂时无法确认网络</h1>
+              <p id="last-checked" class="muted">还没收到守护程序的状态</p>
             </div>
           </div>
           <div class="guardian">
-            <h2>后台守护</h2>
-            <p id="guardian-state">正在读取</p>
+            <h2>守护程序</h2>
+            <p id="guardian-state">未收到更新</p>
           </div>
         </section>
         <div class="status-groups">

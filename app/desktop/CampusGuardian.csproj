@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>CampusGuardian</AssemblyName>
-    <Version>0.2.4</Version>
+    <Version>0.2.5</Version>
     <Product>SUSE 校园网守护</Product>
     <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
     <ApplicationIcon>assets/campus-guardian.ico</ApplicationIcon>
@@ -21,6 +21,8 @@
     <Content Include="ui/glass-navigation.js" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="ui/glass-navigation.css" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="ui/glass-controls.js" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="ui/connection-status.js" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="ui/vendor/webawesome/spinner.js" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="ui/vendor/glassy-liquid/**/*.js" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="ui/icons/lucide/*.svg" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="ui/schedule-editor.js" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

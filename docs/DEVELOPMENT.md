@@ -48,6 +48,8 @@ flowchart LR
 
 窗口标识沿用项目的 `campus-guardian.ico`；Wi‑Fi、显隐密码、复制等小图标来自 [Lucide 0.468.0](../app/desktop/ui/icons/lucide/UPSTREAM.md)。保留原版 SVG，随程序离线加载，不手绘路径。
 
+状态区参考 [IHG 的 Wi‑Fi 检测](https://mobbin.com/screens/61e9df5c-4f3a-4dac-b84c-be35153e9691) 和 [NordVPN 的已连接状态](https://mobbin.com/screens/efe68d88-42bb-4d50-b002-15a052b95f3d)，使用已有 Lucide Wi‑Fi 图标和单独打包的 [Web Awesome Spinner](../app/desktop/ui/vendor/webawesome/UPSTREAM.md)。`connection-status.js` 只把后台已报告的接入、检查、验证、外网结果并排显示；不驱动后台，不伪造检测进度。正在处理时才转圈，恢复在线时只亮一次，启用减少动态效果后保留同样的文字但不播放动画。
+
 ```mermaid
 flowchart LR
   A["ui/index.html · 页面与原生输入"] --> B["glass-navigation.js / glass-controls.js · 连接控件"]
@@ -55,6 +57,8 @@ flowchart LR
   A --> C["schedule-editor.js · 选择和复制草稿"]
   C -- 保存 --> D["status-view.js · 现有 WebView2 桥接"]
   D --> E["campus_schedule.py · 既有校验与持久化"]
+  D -- 快照与有效性 --> S["connection-status.js · 状态文案与动效"]
+  S --> W["已有 Lucide 图标 + 本地 Web Awesome Spinner"]
 ```
 
 从仓库根目录运行下列命令；构建需要 [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)。源码运行环境与桌面产物在 `app/`，SDK 缓存、测试报告和候选 ZIP 在根目录的 `runtime/`，均不提交。
@@ -77,10 +81,10 @@ flowchart LR
 .\app\.venv\Scripts\python.exe -X utf8 tests/e2e_desktop.py --exe app/runtime/desktop/CampusGuardian.exe --output runtime/desktop-e2e
 ```
 
-打包前先提交公开源码、重新构建，再运行 `python scripts/package.py --version 0.2.4`。ZIP 按运行文件清单生成，第三方许可在 `app/licenses/`。测试、演练与开发脚本只留源码，不随包发；发布方应从实际解压包验证入口，而不是让下载者跑测试。仅验收当前布局时，可附 `--output-dir runtime/layout-verification`，不覆盖现有发行文件。
+打包前先提交公开源码、重新构建，再运行 `python scripts/package.py --version 0.2.5`。ZIP 按运行文件清单生成，第三方许可在 `app/licenses/`。测试、演练与开发脚本只留源码，不随包发；发布方应从实际解压包验证入口，而不是让下载者跑测试。仅验收当前布局时，可附 `--output-dir runtime/layout-verification`，不覆盖现有发行文件。
 
 ```powershell
-.\app\.venv\Scripts\python.exe -X utf8 tests/e2e_distribution.py --zip runtime/release/CampusNetworkGuardian-0.2.4-win-x64.zip --output runtime/distribution-e2e
+.\app\.venv\Scripts\python.exe -X utf8 tests/e2e_distribution.py --zip runtime/release/CampusNetworkGuardian-0.2.5-win-x64.zip --output runtime/distribution-e2e
 ```
 
 `docs/media/` 只保留 README 用到的 GIF 和图标；逐帧截图与演练报告留在本机 `runtime/`，不提交。`scripts/render_demo.py` 从回环演练的真实窗口截图生成 GIF；Wi‑Fi 状态和门户均为模拟。提交 issue 时仅附不含身份的结果代码与复现情况。

@@ -23,11 +23,12 @@ def main():
 
     captions = (
         ("first-run", "01   首次打开，填上校园网账号", 3500),
-        ("wifi-join", "02   没连 Wi-Fi、也没外网，先尝试接入 SUSE", 3300),
-        ("online", "03   连上 SUSE 后登录，确认外网恢复", 2900),
-        ("other-wifi", "04   连着其他 Wi-Fi，即使没网也不抢占", 3300),
-        ("accounts", "05   从右上角管理主账号和备用账号", 2900),
-        ("logs", "06   查看登录结果，只看重要记录", 2900),
+        ("schedule", "02   选要守护的日期，填写开始和结束时间", 4200),
+        ("wifi-join", "03   没连 Wi-Fi、也没外网，先尝试接入 SUSE", 3300),
+        ("online", "04   连上 SUSE 后登录，确认外网恢复", 2900),
+        ("other-wifi", "05   连着其他 Wi-Fi，即使没网也不抢占", 3300),
+        ("accounts", "06   从右上角管理主账号和备用账号", 2900),
+        ("logs", "07   查看登录结果，只看重要记录", 2900),
     )
     frames = []
     font = ImageFont.truetype(args.ui_font, 20)

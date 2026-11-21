@@ -19,6 +19,7 @@ TEXT = {
     "online": ("network", "SUSE 外网在线"),
     "outside_window": ("schedule", "已到禁止自动认证时段；不主动下线"),
     "window_open": ("schedule", "已进入自动登录和恢复时段"),
+    "schedule_changed": ("schedule", "守护时段已变更；本轮恢复已停止"),
     "checking_outage": ("quiet", "探测失败，正在复核"),
     "outage_confirmed": ("network", "已确认掉线，开始恢复"),
     "other_network_online": ("wifi", "其他网络外网已通，保持现状"),

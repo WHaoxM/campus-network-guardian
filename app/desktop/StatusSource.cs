@@ -36,7 +36,8 @@ internal sealed record DesktopConfig(string StatusFile, string ProfileDirectory,
 
 internal sealed record Snapshot(int Schema, string RunId, int Pid, DateTimeOffset StartedAt,
     DateTimeOffset HeartbeatAt, bool Fixture, string Phase, bool? Allowed, string Link,
-    string Internet, DateTimeOffset? LastCheckAt, string? Outcome, DateTimeOffset? PauseUntil, string? ControlAck);
+    string Internet, DateTimeOffset? LastCheckAt, string? Outcome, DateTimeOffset? PauseUntil, string? ControlAck,
+    string? ScheduleSource = null, string? ScheduleRevision = null);
 
 internal sealed record LogRow(DateTimeOffset At, string Group, string Message, bool Important, bool Repeat);
 internal sealed record LogFile(int Schema, bool Fixture, LogRow[] Rows);

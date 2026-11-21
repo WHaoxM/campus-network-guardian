@@ -15,7 +15,7 @@ PUBLIC_FILES = {
     "docs/media/desktop-flow.gif": "app/media/desktop-flow.gif",
     **{f"app/{name}": f"app/{name}" for name in (
         "setup.ps1", "scripts/suse.ps1", "requirements.txt",
-        "browser_login.py", "campus_maintenance.py", "campus_accounts.py", "campus_status.py", "campus_log.py",
+        "browser_login.py", "campus_maintenance.py", "campus_accounts.py", "campus_status.py", "campus_log.py", "campus_schedule.py",
         "network_diagnostics.ps1", "enable_guardian.ps1", "install_campus_maintenance.ps1", "install_desktop.ps1",
         "config/browser_login.example.toml", "config/campus.toml",
     )},

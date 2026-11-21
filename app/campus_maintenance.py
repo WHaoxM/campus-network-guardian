@@ -1,6 +1,6 @@
 """Windows campus Wi-Fi maintenance. This module never calls portal logout."""
 import argparse
-from datetime import datetime, time, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 import http.client
 import ipaddress
 import json
@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 from browser_login import Stop, online, run, single_instance, validate_config, wlan_interfaces
 from campus_accounts import load_accounts
 from campus_log import FILTERS, TEXT, date_label, safe_code, show_log
+from campus_schedule import allowed_window, boundaries, parse_windows, read_schedule
 from campus_status import DesktopStatus
 
 
@@ -24,16 +25,6 @@ ZONE = timezone(timedelta(hours=8), name="Asia/Shanghai")
 SAFE_SSID = re.compile(r"[A-Za-z0-9 _.-]{1,32}")
 SAFE_ALIAS = re.compile(r"[A-Za-z0-9_-]{1,40}")
 ENV_KEY = re.compile(r"[A-Z][A-Z0-9_]{1,63}")
-
-
-def allowed_window(now, windows):
-    for day in (now.date(), now.date() - timedelta(days=1)):
-        start, end = windows[day.weekday()]
-        begin = datetime.combine(day, start, ZONE)
-        finish = datetime.combine(day + timedelta(days=int(end < start)), end, ZONE)
-        if begin <= now < finish:
-            return begin.isoformat()
-    return None
 
 
 def parse_time(value):
@@ -61,7 +52,7 @@ def read_config(path):
         cfg["desktop_status_path"] = snapshot
     cfg["browser_root"] = (browser_path.parent / browser["local"]["runtime_dir"]).resolve()
     policy = cfg["schedule"]
-    if len(policy["windows"]) != 7 or not policy["backoff_seconds"]:
+    if not policy["backoff_seconds"]:
         raise Stop("invalid_schedule")
     timings = [policy[k] for k in ("poll_seconds", "failure_rounds", "cooldown_seconds", "join_retry_seconds")]
     timings.extend(policy[k] for k in ("join_poll_seconds", "join_scan_retry_seconds") if k in policy)
@@ -70,13 +61,8 @@ def read_config(path):
         raise Stop("invalid_dns_timeout")
     if any(type(n) is not int or n <= 0 for n in [*timings, *policy["backoff_seconds"]]):
         raise Stop("invalid_retry_policy")
-    windows = [tuple(time.fromisoformat(part) for part in x.split("-")) for x in policy["windows"]]
-    if any(len(pair) != 2 or pair[0] == pair[1] or any(t.tzinfo is not None for t in pair) for pair in windows):
-        raise Stop("invalid_windows")
-    for index, (_, end) in enumerate(windows):
-        if end < windows[index][0] and end > windows[(index + 1) % 7][0]:
-            raise Stop("overlapping_windows")
-    cfg["windows_by_day"] = windows
+    if "windows" in policy:
+        cfg["legacy_windows"] = parse_windows(policy["windows"], legacy=True)
     if not SAFE_SSID.fullmatch(browser["local"]["wifi_ssid"]):
         raise Stop("invalid_saved_wlan_name")
     accounts = cfg["accounts"]
@@ -225,7 +211,7 @@ class Controller:
         return parse_time(self.scenario()["now"]) if self.fixture_file else datetime.now(ZONE)
 
     def window(self):
-        return allowed_window(self.now(), self.cfg["windows_by_day"])
+        return allowed_window(self.now(), read_schedule(self.cfg)[1], ZONE)
 
     def sleep_seconds(self, elapsed, outcome):
         now = self.now()
@@ -237,11 +223,9 @@ class Controller:
             # Check association/DHCP sooner; netsh reconnection itself remains throttled.
             poll = min(poll, self.policy.get("join_poll_seconds", poll))
         until = max(0.1, poll - elapsed)
+        _, windows = read_schedule(self.cfg)
         for day in (now.date() - timedelta(days=1), now.date(), now.date() + timedelta(days=1)):
-            start, end = self.cfg["windows_by_day"][day.weekday()]
-            begin = datetime.combine(day, start, ZONE)
-            finish = datetime.combine(day + timedelta(days=int(end < start)), end, ZONE)
-            for boundary in (begin, finish):
+            for boundary in boundaries(day, windows, ZONE):
                 if boundary > now:
                     until = min(until, (boundary - now).total_seconds())
         return until
@@ -341,15 +325,20 @@ class Controller:
                 "source_available": bool(source), "suse_probe_ok": wlan_online(net, source) if source else None}
 
     def guard(self, window, expected_guid=None):
+        def check_schedule():
+            schedule, windows = read_schedule(self.cfg)
+            if (schedule["source"], schedule["revision"]) != self.round_schedule:
+                raise Stop("schedule_changed")
+            if allowed_window(self.now(), windows, ZONE) != window:
+                raise Stop("outside_window")
+
         if self.desktop_paused():
             raise Stop("pause_gate_wait")
-        if self.window() != window:
-            raise Stop("outside_window")
+        check_schedule()
         if expected_guid is not None:
             if not any(item["guid"] == expected_guid and item["ssid"] == self.ssid for item in self.wifi()):
                 raise Stop("wifi_changed_before_submit")
-            if self.window() != window:
-                raise Stop("outside_window")
+            check_schedule()
             if self.desktop_paused():
                 raise Stop("pause_gate_wait")
 
@@ -413,9 +402,13 @@ class Controller:
     def tick(self):
         self.sync_accounts()
         s = self.state()
-        now = self.now().timestamp()
-        window = self.window()
+        local_now = self.now()
+        now = local_now.timestamp()
+        schedule, windows = read_schedule(self.cfg)
+        self.round_schedule = schedule["source"], schedule["revision"]
+        window = allowed_window(local_now, windows, ZONE)
         if self.desktop_status:
+            self.desktop_status.schedule_source, self.desktop_status.schedule_revision = self.round_schedule
             self.desktop_status.publish("checking", allowed=bool(window))
         paused = self.desktop_paused()
         if not window:
@@ -519,6 +512,10 @@ class Controller:
             attempts.append(result)
             reason = result["result"]
             if reason == "pause_gate_wait":
+                return self.finish(s, reason, attempts)
+            if reason == "schedule_changed":
+                self.event(reason)
+                s["next_attempt"] = 0
                 return self.finish(s, reason, attempts)
             self.event(reason, kind="attempt_result", alias=account["alias"], submissions=result["submissions"])
             if not result["submissions"] and reason in {"wifi_status_unavailable", "wifi_changed_before_submit", "wifi_not_connected"}:

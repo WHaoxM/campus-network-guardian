@@ -1,5 +1,15 @@
 {
   "second_probe": "/second-online",
+  "legacy_windows": ["07:00-23:00", "07:00-23:00", "07:00-23:00", "07:00-23:00", "07:00-01:00", "07:00-01:00", "07:00-23:00"],
+  "desktop_schedule": {
+    "thursday": ["07:03", "07:09"],
+    "friday": ["22:20", "01:18"],
+    "saturday_overlap": ["01:00", "03:00"],
+    "before_carryover_end": "2026-11-14T01:17:59+08:00",
+    "carryover_end": "2026-11-14T01:18:00+08:00",
+    "new_thursday_start": "08:08",
+    "new_thursday_end": "24:00"
+  },
   "accounts": [
     ["first", "fixture-student", "fixture-pass"],
     ["second", "fixture-second", "fixture-wrong"],

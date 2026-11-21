@@ -5,6 +5,7 @@ import sys
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from browser_login import Stop, credentials
+from campus_schedule import read_schedule, save_schedule
 from campus_status import atomic_json, read_local_json, valid_id
 
 
@@ -99,8 +100,16 @@ def main():
             raise Stop("account_profile_mismatch")
         request = json.loads(sys.stdin.read(8193))
         action = request["action"]
-        rows = load_accounts(cfg) if action == "list" else edit_accounts(cfg, action, request)
-        result = {"rows": public_rows(rows)}
+        schedule, _ = read_schedule(cfg)
+        if action == "schedule_read":
+            result = {"schedule": schedule}
+        elif action == "schedule_save":
+            result = {"schedule": save_schedule(cfg, request.get("windows"))}
+        elif action in ("first", "activate") and schedule["source"] not in ("custom", "legacy"):
+            result = {"error": "schedule_required", "schedule": schedule}
+        else:
+            rows = load_accounts(cfg) if action in ("list", "activate") else edit_accounts(cfg, action, request)
+            result = {"rows": public_rows(rows), "schedule": schedule}
     except Stop as exc:
         result = {"error": str(exc)}
     except (ValueError, OSError, TypeError, KeyError, IndexError):

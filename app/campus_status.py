@@ -91,6 +91,8 @@ class DesktopStatus:
         self.fixture = fixture
         self.phase = "starting"
         self.allowed = None
+        self.schedule_source = None
+        self.schedule_revision = None
         self.link = "unknown"
         self.internet = "unknown"
         self.last_check = None
@@ -131,6 +133,7 @@ class DesktopStatus:
             "schema": 1, "run_id": self.run_id, "pid": os.getpid(),
             "started_at": self.started, "heartbeat_at": self.utc_now(),
             "fixture": self.fixture, "phase": self.phase, "allowed": self.allowed,
+            "schedule_source": self.schedule_source, "schedule_revision": self.schedule_revision,
             "link": self.link, "internet": self.internet,
             "last_check_at": self.last_check, "outcome": self.outcome,
             "pause_until": self.control.until.isoformat() if self.control.active() else None,

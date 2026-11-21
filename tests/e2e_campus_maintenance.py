@@ -121,6 +121,7 @@ def main():
                 write_browser(browser_path, browser_template, base, relay, spec)
                 campus_path = root / cfg.name
                 campus = cfg.read_text(encoding="utf-8").split("[[accounts]]", 1)[0]
+                campus = campus.replace("[schedule]", "[schedule]\nwindows = " + json.dumps(scenario["legacy_windows"]), 1)
                 campus = re.sub(r'(?m)^runtime_dir\s*=.*$', 'runtime_dir = "state"', campus)
                 env, blocks = [], []
                 for index, (alias, user, password) in enumerate(scenario["accounts"]):

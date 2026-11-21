@@ -7,9 +7,11 @@ using System.Security.Principal;
 namespace CampusGuardian;
 
 internal sealed record AccountRow(string Id, string Tail, bool Primary);
-internal sealed record AccountResult(AccountRow[]? Rows = null, string? Error = null);
-internal sealed record AccountMessage(string Type, AccountRow[]? Rows, bool? Enabled, string? Error);
-internal sealed record AccountRequest(string Action, string? Id = null, string? Username = null, string? Password = null);
+internal sealed record ScheduleSettings(string Source, string? Revision, string?[] Windows);
+internal sealed record AccountResult(AccountRow[]? Rows = null, string? Error = null, ScheduleSettings? Schedule = null);
+internal sealed record AccountMessage(string Type, AccountRow[]? Rows, bool? Enabled, string? Error, ScheduleSettings? Schedule = null);
+internal sealed record AccountRequest(string Action, string? Id = null, string? Username = null, string? Password = null,
+    string?[]? Windows = null);
 
 internal sealed class AccountService(DesktopConfig config, bool rehearsal)
 {
@@ -24,21 +26,22 @@ internal sealed class AccountService(DesktopConfig config, bool rehearsal)
         bool? enabled = null;
         try
         {
-            if (action is not ("list" or "first" or "add" or "password" or "primary" or "remove" or "activate"))
+            if (action is not ("list" or "first" or "add" or "password" or "primary" or "remove" or "activate"
+                or "schedule_read" or "schedule_save"))
                 return new("accounts", null, null, "account_fields");
             var python = (await File.ReadAllTextAsync(config.AccountPython!)).Trim();
             if (!Path.IsPathFullyQualified(python) || !File.Exists(python))
                 return new("accounts", null, null, "setup_required");
 
-            if (action is not ("list" or "activate"))
+            if (action is not ("list" or "activate" or "schedule_read"))
             {
                 if (rehearsal) Directory.CreateDirectory(Path.GetDirectoryName(config.StatusFile)!);
                 else if (await RunScriptAsync("install_desktop.ps1", "Prepare") != 0)
                     return new("accounts", null, null, "account_storage_error");
             }
 
-            result = await RunAccountToolAsync(python, action == "activate" ? new("list") : request);
-            if (result.Error is not null) return new("accounts", null, null, result.Error);
+            result = await RunAccountToolAsync(python, request);
+            if (result.Error is not null) return new("accounts", null, null, result.Error, result.Schedule);
             if (action is "first" or "activate")
             {
                 if (result.Rows is not { Length: > 0 })
@@ -69,7 +72,7 @@ internal sealed class AccountService(DesktopConfig config, bool rehearsal)
         catch (Exception ex) when (ex is IOException or JsonException or Win32Exception
                                     or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
         { return new("accounts", result.Rows, enabled, "account_storage_error"); }
-        return new("accounts", result.Rows, enabled, result.Error);
+        return new("accounts", result.Rows, enabled, result.Error, result.Schedule);
     }
 
     private async Task<AccountResult> RunAccountToolAsync(string python, AccountRequest request)

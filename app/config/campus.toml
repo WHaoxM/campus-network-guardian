@@ -6,8 +6,8 @@ python_path_file = "browser_python.txt"
 task_watchdog_minutes = 5
 
 [schedule]
-# Monday through Sunday; an end earlier than its start belongs to the next day.
-windows = ["07:00-23:00", "07:00-23:00", "07:00-23:00", "07:00-23:00", "07:00-01:00", "07:00-01:00", "07:00-23:00"]
+# New installs choose recovery hours in the desktop. Retained windows from
+# earlier versions are read only until the user saves their own schedule.
 poll_seconds = 10
 failure_rounds = 3
 cooldown_seconds = 600

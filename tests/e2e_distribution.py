@@ -59,7 +59,7 @@ def run(archive_path, output):
             top = {p.parts[1] for p in members if len(p.parts) >= 2}
             if top != {"README.md", "LICENSE", "suse.cmd", "app"} or any(
                 part in {"tests", ".env", ".venv", "demo.ps1", "build_desktop.ps1", "browser_python.txt",
-                         "browser_login.toml", "accounts.private.json"}
+                         "browser_login.toml", "accounts.private.json", "schedule.json"}
                 for p in members for part in p.parts
             ):
                 raise RuntimeError("Developer-only or private files are in the distribution")
@@ -115,6 +115,26 @@ def run(archive_path, output):
                 page = browser.contexts[0].pages[0]
                 expect(page.get_by_role("heading", name="添加校园网账号")).to_be_visible(timeout=15000)
                 expect(page.get_by_role("button", name="保存并开启守护")).to_be_visible()
+                expect(page.locator("#first-schedule-summary")).to_have_text("尚未设置")
+                page.get_by_role("button", name="设置时段").click()
+                editor = page.get_by_role("dialog", name="守护时段")
+                editor.get_by_role("checkbox", name="周四").check()
+                start = editor.get_by_role("textbox", name="周四开始时间")
+                end = editor.get_by_role("textbox", name="周四结束时间")
+                expect(start).to_have_value("")
+                expect(end).to_have_value("")
+                hours = json.loads((Path(__file__).parent / "data/campus_journey.json").read_text(encoding="utf-8"))
+                start_value, end_value = hours["desktop_schedule"]["thursday"]
+                start.fill(start_value)
+                end.fill(end_value)
+                editor.get_by_role("button", name="保存时段").click()
+                expect(editor).to_be_hidden()
+                expect(page.locator("#first-schedule-summary")).to_have_text("每周 1 天 · 北京时间")
+                settings = app / "runtime/campus/desktop/schedule.json"
+                saved = json.loads(settings.read_text(encoding="utf-8"))
+                if saved["windows"][3] != f"{start_value}-{end_value}":
+                    raise RuntimeError("Packaged schedule editor did not persist the selected hours")
+                checks.append("packaged_desktop_sets_user_hours_without_enabling_a_task")
                 before, = desktop_pids(exe)
                 profile.write_text(profile.read_text(encoding="utf-8") + "\n# distribution-test-preserve\n", encoding="utf-8")
                 state = (profile.read_bytes(), marker.stat().st_mtime_ns)

@@ -259,12 +259,12 @@ h2 { font-size: max(20px, calc(46 * var(--u))); font-weight: 700; line-height: 1
   padding: 10px 11px; margin-block: 10px; border-radius: 6px;
   background: #edf3f9; color: var(--blue-ink);
 }
-#account-dialog {
+#account-dialog, #schedule-dialog {
   padding: 20px 24px; width: min(470px, calc(100% - 28px)); max-width: none;
   max-height: calc(100% - 26px); color: var(--ink); background: var(--surface);
   border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 38px #0c0e1140;
 }
-#account-dialog::backdrop { background: #10101051; }
+#account-dialog::backdrop, #schedule-dialog::backdrop { background: #10101051; }
 .dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
 .dialog-header h2 { font-size: 24px; }
 .dialog-close { font-size: 24px; line-height: 1; }
@@ -287,6 +287,37 @@ h2 { font-size: max(20px, calc(46 * var(--u))); font-weight: 700; line-height: 1
 .account-more-menu button { text-align: left; }
 .dialog-actions { display: flex; gap: 9px; justify-content: flex-end; margin-top: 16px; }
 .account-message { margin-top: 10px; color: var(--blue-ink); }
+
+.schedule-entry {
+  display: flex; gap: 10px; align-items: center; justify-content: space-between;
+  padding-block: 12px; border-bottom: 1px solid var(--line);
+}
+.schedule-entry p { margin-top: 4px; font-size: 14px; }
+.schedule-entry button { flex: none; }
+.first-schedule { margin-top: 12px; padding-block: 3px 0; border-bottom: 0; }
+#schedule-dialog { width: min(480px, calc(100% - 28px)); padding: 12px clamp(12px, 3vw, 24px); }
+#schedule-help { font-size: 14px; line-height: 1.5; }
+.schedule-columns, .schedule-day {
+  display: grid; align-items: center; grid-template-columns: 84px minmax(0, 1fr) 10px minmax(0, 1fr);
+  gap: clamp(4px, 1vw, 9px);
+}
+.schedule-columns { margin-top: 15px; padding-bottom: 7px; font-size: 13px; color: var(--muted); }
+.schedule-day { border-top: 1px solid var(--line); min-height: 38px; font-size: 14px; }
+.schedule-day label { display: flex; align-items: center; gap: 7px; cursor: pointer; min-height: 34px; }
+.schedule-day label input { margin: 0; inline-size: 17px; block-size: 17px; accent-color: var(--blue); }
+.schedule-day input[type="text"] {
+  width: 100%; min-height: 32px; padding: 4px 7px; font: inherit; font-variant-numeric: tabular-nums;
+  border: 1px solid #8f959b; border-radius: 6px; background: white; color: var(--ink);
+}
+.schedule-day input:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.schedule-day input[aria-invalid="true"] { border-color: #9f3026; }
+.schedule-day .schedule-off { grid-column: 2 / -1; font-size: 13px; }
+.schedule-end { position: relative; }
+.schedule-end:has(span:not([hidden])) input { padding-right: 35px; }
+.schedule-end span { position: absolute; right: 7px; top: 7px; pointer-events: none; font-size: 12px; color: var(--muted); }
+.schedule-feedback { margin-top: 8px; color: #923229; font-size: 14px; }
+.schedule-feedback:empty { margin-top: 0; }
+#schedule-dialog .dialog-actions { margin-top: 10px; }
 
 @media (max-height: 500px) {
   .account-setup { padding-top: 23px; }

@@ -92,8 +92,11 @@
   }
 
   let pauseAction = "pause";
+  let appliedSchedule = null;
   function render({ health, snapshot, probe_fresh, events: incoming, pending, notice }) {
     const live = health === "running" || health === "heartbeat";
+    appliedSchedule = live ? snapshot : null;
+    renderScheduleSummary();
     const isOnline = live && probe_fresh && snapshot?.link === "suse" && snapshot?.internet === "online";
     const isOffline = live && probe_fresh && snapshot?.link === "suse" && snapshot?.internet === "offline";
     byId("guardian-state").textContent = guardians[health] ?? guardians.missing;
@@ -111,6 +114,8 @@
     const paused = live && Number.isFinite(pausedUntil) && pausedUntil > Date.now();
     byId("recovery-heading").textContent = paused ? "自动恢复已暂停"
       : !live || snapshot?.allowed == null ? "自动恢复状态未知"
+      : snapshot.schedule_source === "unset" ? "尚未设置守护时段"
+      : snapshot.schedule_source === "invalid" ? "守护时段配置有误"
       : snapshot.allowed ? "自动恢复已启用" : "不在自动恢复时段";
     byId("recovery-detail").textContent = notice ?? (!live ? "等待守护器发布状态"
       : pending ? "等待守护器确认，不会中断现有连接"
@@ -132,6 +137,9 @@
 
   if (!window.chrome?.webview) return;
   const dialog = byId("account-dialog");
+  const scheduleDialog = byId("schedule-dialog");
+  const scheduleDays = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+  let schedule = null, scheduleOpener = null;
   let rows = [], inFlight = "", target = null, editAction = "add";
   const feedback = {
     setup_required: "请从解压目录运行 suse.cmd 完成环境准备。",
@@ -145,7 +153,132 @@
     startup_conflict: "检测到其他安装路径的启动项或任务。请先停用旧版，本版未覆盖它。",
     watcher_not_ready: "账号已保存，但没有收到后台守护的启动确认。",
     startup_failed: "账号已保存，但没能启用开机守护。请检查 Windows 权限后重试。",
+    schedule_required: "请先设置守护时段。",
+    schedule_needs_day: "请至少选一天并填写开始和结束时间。",
+    invalid_windows: "请检查时间格式，开始和结束不能相同。",
+    overlapping_windows: "跨日时段与次日的开始时间重叠，请调整后再保存。",
   };
+
+  const scheduleConfigured = () => ["custom", "legacy"].includes(schedule?.source);
+  function renderScheduleSummary() {
+    const count = schedule?.windows?.filter(Boolean).length ?? 0;
+    const summary = schedule?.source === "legacy" ? `沿用原设置 · 每周 ${count} 天`
+      : schedule?.source === "custom" ? `每周 ${count} 天 · 北京时间`
+      : schedule?.source === "invalid" ? "时段读取失败，请重新设置"
+      : schedule ? "尚未设置" : "正在读取";
+    byId("first-schedule-summary").textContent = summary;
+    const confirmed = appliedSchedule?.schedule_revision === schedule?.revision
+      && appliedSchedule?.schedule_source === "custom";
+    const statusSummary = summary + (schedule?.source === "custom" && !confirmed ? " · 等待后台应用" : "");
+    const status = byId("schedule-summary");
+    if (status.textContent !== statusSummary) status.textContent = statusSummary;
+  }
+
+  const clockPattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+  const scheduleInputs = scheduleDays.map((day) => {
+    const row = document.createElement("div");
+    row.className = "schedule-day";
+    const label = document.createElement("label");
+    const toggle = Object.assign(document.createElement("input"), { type: "checkbox" });
+    label.append(toggle, day);
+    const field = (part, placeholder) => {
+      const input = Object.assign(document.createElement("input"), { type: "text", placeholder, maxLength: 5 });
+      input.setAttribute("aria-label", `${day}${part}时间`);
+      input.autocomplete = "off";
+      input.spellcheck = false;
+      return input;
+    };
+    const start = field("开始", "时:分");
+    const end = field("结束", "时:分");
+    end.title = "全天可填写 00:00 至 24:00";
+    const divider = element("span", "–");
+    divider.setAttribute("aria-hidden", "true");
+    const endField = document.createElement("div");
+    endField.className = "schedule-end";
+    const next = element("span", "次日");
+    endField.append(end, next);
+    const off = element("span", "无独立时段");
+    off.className = "schedule-off muted";
+    function update() {
+      off.hidden = toggle.checked;
+      start.hidden = endField.hidden = divider.hidden = !toggle.checked;
+      const valid = clockPattern.test(start.value) && clockPattern.test(end.value);
+      next.hidden = !valid || end.value >= start.value;
+      if (next.hidden) end.removeAttribute("aria-description");
+      else end.setAttribute("aria-description", "次日结束");
+    }
+    function changed() {
+      byId("schedule-feedback").textContent = "";
+      start.removeAttribute("aria-invalid");
+      end.removeAttribute("aria-invalid");
+      update();
+    }
+    toggle.addEventListener("change", changed);
+    start.addEventListener("input", changed);
+    end.addEventListener("input", changed);
+    row.append(label, start, divider, endField, off);
+    byId("schedule-days").append(row);
+    return { toggle, start, end, update };
+  });
+  function openSchedule(opener) {
+    if (inFlight) return;
+    scheduleOpener = opener;
+    scheduleDialog.showModal();
+    byId("schedule-feedback").textContent = "正在读取时段…";
+    byId("schedule-days").hidden = true;
+    sendAccount("schedule_read");
+  }
+  function fillSchedule() {
+    scheduleInputs.forEach(({ toggle, start, end, update }, i) => {
+      const value = schedule?.windows?.[i];
+      toggle.checked = Boolean(value);
+      [start.value, end.value] = value?.split("-") ?? ["", ""];
+      start.removeAttribute("aria-invalid");
+      end.removeAttribute("aria-invalid");
+      update();
+    });
+    byId("schedule-days").hidden = false;
+  }
+  function scheduleBusy(busy) {
+    byId("schedule-save").disabled = busy;
+    byId("schedule-close").disabled = busy;
+    byId("schedule-cancel").disabled = busy;
+    for (const { toggle, start, end } of scheduleInputs) toggle.disabled = start.disabled = end.disabled = busy;
+  }
+  byId("schedule-open").addEventListener("click", (e) => openSchedule(e.currentTarget));
+  byId("first-schedule-open").addEventListener("click", (e) => openSchedule(e.currentTarget));
+  byId("schedule-close").addEventListener("click", () => scheduleDialog.close());
+  byId("schedule-cancel").addEventListener("click", () => scheduleDialog.close());
+  scheduleDialog.addEventListener("cancel", (e) => {
+    if (inFlight.startsWith("schedule_")) e.preventDefault();
+  });
+  scheduleDialog.addEventListener("close", () => scheduleOpener?.focus());
+  byId("schedule-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (inFlight || byId("schedule-days").hidden) return;
+    const windows = [];
+    for (const [i, { toggle, start, end }] of scheduleInputs.entries()) {
+      if (!toggle.checked) { windows.push(null); continue; }
+      start.value = start.value.trim();
+      end.value = end.value.trim();
+      const bad = !clockPattern.test(start.value) ? start
+        : !(clockPattern.test(end.value) || end.value === "24:00") || start.value === end.value ? end : null;
+      if (bad) {
+        byId("schedule-feedback").textContent = `${scheduleDays[i]}：${feedback.invalid_windows}`;
+        bad.setAttribute("aria-invalid", "true");
+        bad.focus();
+        return;
+      }
+      windows.push(`${start.value}-${end.value}`);
+    }
+    if (!windows.some(Boolean)) {
+      byId("schedule-feedback").textContent = feedback.schedule_needs_day;
+      scheduleInputs[0].toggle.focus();
+      return;
+    }
+    byId("schedule-feedback").textContent = "正在保存…";
+    sendAccount("schedule_save", { windows });
+  });
 
   function notify(message = "", inDialog = false) {
     const box = byId(inDialog ? "account-dialog-feedback" : "account-feedback");
@@ -157,6 +290,7 @@
   function sendAccount(action, data = {}) {
     if (inFlight) return;
     inFlight = action;
+    if (action.startsWith("schedule_")) scheduleBusy(true);
     const first = byId("first-submit");
     first.disabled = true;
     first.textContent = action === "first" ? "正在保存并开启…" : "保存并开启守护";
@@ -233,15 +367,36 @@
     byId("first-submit").textContent = "保存并开启守护";
     byId("enable-guardian").disabled = false;
     for (const button of dialog.querySelectorAll("button")) button.disabled = false;
+    if (data.schedule) {
+      schedule = data.schedule;
+      renderScheduleSummary();
+    }
+    if (action.startsWith("schedule_")) {
+      scheduleBusy(false);
+      if (data.error || !data.schedule) {
+        byId("schedule-feedback").textContent = feedback[data.error] ?? "无法读取或保存时段，请重试。";
+        byId("schedule-save").disabled = action === "schedule_read";
+      } else if (action === "schedule_save") {
+        if (!rows.length) notify();
+        scheduleDialog.close();
+      } else {
+        fillSchedule();
+        byId("schedule-feedback").textContent = schedule.source === "invalid" ? "原时段无法读取，请重新设置。" : "";
+        scheduleInputs[0].toggle.focus();
+      }
+      return;
+    }
     const message = data.error && (feedback[data.error] ?? "无法读取或保存账号，未显示任何凭证。");
     if (Array.isArray(data.rows)) {
       rows = data.rows;
       byId("account-open").hidden = false;
       byId("account-setup").hidden = rows.length !== 0;
       byId("monitor-content").hidden = rows.length === 0;
+      byId("schedule-entry").hidden = rows.length === 0;
       renderAccounts();
     }
     if (data.enabled != null) byId("enable-guardian").hidden = data.enabled || !rows.length;
+    if (data.error === "schedule_required" && rows.length) byId("enable-guardian").hidden = false;
     if (["list", "first", "activate"].includes(action)) {
       notify(message || (data.enabled === false && rows.length ? "账号已保存，开机守护尚未启用。" : ""));
       if (action === "first" && rows.length) byId("first-account").reset();
@@ -284,6 +439,10 @@
       byId(username ? "first-password" : "first-username").focus();
       return;
     }
+    if (!scheduleConfigured()) {
+      openSchedule(byId("first-schedule-open"));
+      return;
+    }
     sendAccount("first", { username, password: input.value });
     input.value = "";
     input.type = "password";
@@ -292,6 +451,10 @@
     notify("正在保存账号并开启守护…");
   });
   byId("enable-guardian").addEventListener("click", () => {
+    if (!scheduleConfigured()) {
+      openSchedule(byId("schedule-open"));
+      return;
+    }
     sendAccount("activate");
     notify("正在开启守护…");
   });

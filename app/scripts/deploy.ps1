@@ -9,7 +9,6 @@ param(
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 $utf8 = [Text.UTF8Encoding]::new($false)
-$OutputEncoding = $utf8   # Native account validation reads UTF-8 JSON from stdin, without BOM.
 $source = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $target = [IO.Path]::GetFullPath($Directory).TrimEnd('\')
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -237,8 +236,14 @@ try {
     }
     & (Join-Path $app 'setup.ps1')
     if ($LASTEXITCODE) { throw '新的本地环境未能初始化。' }
-    $reply = '{"action":"list"}' | & $python -I -B -X utf8 (Join-Path $app 'campus_accounts.py') $config live $heartbeat
-    if ($LASTEXITCODE -or !$reply -or ($reply | ConvertFrom-Json).error) { throw '新版无法读取现有账号或时段，已停止切换。' }
+    # Use the same account entrypoint as the desktop; PowerShell 5 can add a
+    # BOM when piping text into a native process.
+    $checkAccounts = "import io, json, sys; from campus_accounts import main; sys.stdin = io.StringIO(json.dumps(dict(action='list'))); main()"
+    $output = & $python -I -B -X utf8 -c $checkAccounts $config live $heartbeat
+    $accountCheck = if (!$LASTEXITCODE -and $output) { $output | ConvertFrom-Json } else { $null }
+    if (!$accountCheck -or $accountCheck.error -or $accountCheck.schedule.source -eq 'invalid') {
+        throw '新版无法读取现有账号或时段，已停止切换。'
+    }
     if ($task) {
         $action = New-ScheduledTaskAction -Execute $python -Argument $taskArguments -WorkingDirectory $app
         Set-ScheduledTask -TaskName $taskName -TaskPath '\' -Action $action | Out-Null

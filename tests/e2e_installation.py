@@ -5,6 +5,8 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import socket
+import subprocess
+import sys
 from uuid import uuid4
 from zipfile import ZipFile
 
@@ -92,6 +94,13 @@ def run(bundle, legacy, output):
             expect(page.locator("#first-schedule-summary")).to_have_text("每周 1 天 · 北京时间")
 
         opening(first, scratch, env, fresh)
+        browser_test = Path(__file__).with_name("e2e_browser_login.py")
+        fixture = browser_test.parent / "data"
+        subprocess.run([sys.executable, str(browser_test), "--python", str(app / "runtime/python/python.exe"),
+                        "--login-only", "--config", str(app / "config/browser_login.example.toml"),
+                        "--journey", str(fixture / "browser_journey.json"), "--html",
+                        str(fixture / "browser_portal.html"), "--output", str(scratch / "bundled-browser.json")],
+                       check=True, timeout=110)
         if (app / "runtime/install-transaction").exists():
             raise RuntimeError("Fresh install left transient files")
 
@@ -99,7 +108,8 @@ def run(bundle, legacy, output):
         old_exe = old_app / "runtime/desktop/CampusGuardian.exe"
         old_program = old_exe.read_bytes()
         private = old_app / "runtime/campus/desktop"
-        reply = ps("& $env:SUSE_PREPARE -Mode Prepare", SUSE_PREPARE=str(old_app / "install_desktop.ps1"))
+        reply = ps("Set-ExecutionPolicy -Scope Process Bypass -Force; & $env:SUSE_PREPARE -Mode Prepare",
+                   SUSE_PREPARE=str(old_app / "install_desktop.ps1"))
         if reply.returncode:
             raise RuntimeError("Could not prepare legacy private store")
         auth = json.loads((Path(__file__).parent / "data/browser_journey.json").read_text(encoding="utf-8"))
@@ -140,7 +150,7 @@ def run(bundle, legacy, output):
 
         opening(old, scratch, env, upgraded)
     print(json.dumps({"outcome": "passed", "checks": ["offline_install_without_system_python",
-          "installed_window_saves_a_schedule", "legacy_failed_upgrade_rolls_back",
+          "installed_window_saves_a_schedule", "bundled_playwright_completes_loopback_login", "legacy_failed_upgrade_rolls_back",
           "legacy_upgrade_reuses_account_schedule_and_profile", "owned_staging_is_reclaimed"],
           "real_s4u_task_mutation": "not_run"}, ensure_ascii=False))
 

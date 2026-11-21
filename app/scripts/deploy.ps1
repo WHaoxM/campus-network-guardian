@@ -9,6 +9,7 @@ param(
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 $utf8 = [Text.UTF8Encoding]::new($false)
+$OutputEncoding = $utf8   # Native account validation reads UTF-8 JSON from stdin, without BOM.
 $source = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $target = [IO.Path]::GetFullPath($Directory).TrimEnd('\')
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()

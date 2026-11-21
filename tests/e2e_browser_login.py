@@ -158,6 +158,8 @@ def main():
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--journey", type=Path, required=True)
     p.add_argument("--html", type=Path, required=True)
+    p.add_argument("--python", type=Path, default=Path(sys.executable), help="Interpreter of the installed app")
+    p.add_argument("--login-only", action="store_true", help="Run the installed browser through one verified fixture login")
     p.add_argument("--serve", action="store_true", help="仅供 Playwright MCP 查看本地假门户")
     args = p.parse_args()
     spec = json.loads(args.journey.read_text(encoding="utf-8"))
@@ -195,15 +197,17 @@ def main():
                 (root / "config.toml").write_text("loopback_fixture = true\n" + text, encoding="utf-8")
                 (root / ".env").write_text(f'CAMPUS_USERNAME={spec["username"]}\nCAMPUS_PASSWORD={spec["password"]}\n', encoding="utf-8")
                 script = config.parents[1] / "browser_login.py"
-                for mode, expected, count, logout_count in (
+                scenarios = (
                     ("prepare", "browser_form_ready", 0, 0),
                     ("login", "browser_login_verified", 1, 0),
                     ("login", "already_online", 1, 0),
                     ("logout-prepare", "logout_ready_not_sent", 1, 0),
                     ("logout", "logout_verified", 1, 1),
                     ("prepare", "browser_form_ready", 1, 1),
-                ):
-                    cmd = [sys.executable, "-X", "utf8", str(script), mode, "--config", str(root / "config.toml"), "--headless"]
+                )
+                for mode, expected, count, logout_count in (scenarios[:2] if args.login_only else scenarios):
+                    cmd = [str(args.python.resolve(strict=True)), "-X", "utf8", str(script), mode,
+                           "--config", str(root / "config.toml"), "--headless"]
                     proc = subprocess.run(cmd, capture_output=True, encoding="utf-8", timeout=80)
                     if proc.returncode or expected not in proc.stdout or state["submissions"] != count or state["relay_posts"]:
                         raise RuntimeError(f"{mode}: expected {expected}, portal POST count={state['submissions']}\n{proc.stdout}\n{proc.stderr}")
@@ -217,9 +221,10 @@ def main():
                     results.append({"command": mode, "outcome": expected, "portal_posts": count,
                                     "relay_visits": state["relay_visits"], "relay_posts": state["relay_posts"],
                                     "logout_posts": logout_count})
-                if state["relay_visits"] != 4:
+                if not args.login_only and state["relay_visits"] != 4:
                     raise RuntimeError("Expected exactly one relay navigation per authentication-page visit")
-                results.append(strict_relay_journey(config.parents[1], root, server, spec))
+                if not args.login_only:
+                    results.append(strict_relay_journey(config.parents[1], root, server, spec))
             output.write_text(json.dumps(results, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             print(json.dumps(results, ensure_ascii=False))
         finally:

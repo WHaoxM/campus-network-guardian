@@ -145,3 +145,20 @@ flowchart LR
   F --> G[提交前复核时段、网卡、账号和路由]
   G --> H[门户成功页与外网均成功才确认]
 ```
+
+### Linux 预览版打包
+
+从已提交的 Linux 发布标签归档，不从本机安装目录打包。这样不会把账号、网卡配置、守护时段、缓存或 Python 环境带进发布物。
+
+```bash
+tag=v0.3.0-linux.1
+git -c tar.umask=0022 archive --format=tar.gz --prefix=campus-network-guardian/ \
+  -o "campus-network-guardian-$tag.tar.gz" "$tag" -- \
+  LICENSE SECURITY.md README.md suse-linux \
+  app/.env.example ':(glob)app/*.py' \
+  app/requirements.txt app/requirements-linux.txt \
+  app/config/browser_login.example.toml app/config/campus.linux.example.toml \
+  linux/campus-guardian.service.example docs/LINUX.md docs/media/icon.png
+```
+
+在 Ubuntu 22.04 上解压，确认 `./suse-linux --help` 无需提权即可运行，再作为 Linux 预览版资产上传。不要将预览版标为 Latest，避免替换 Windows 下载入口。

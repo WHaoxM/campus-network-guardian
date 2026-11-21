@@ -20,7 +20,15 @@ nmcli -f NAME,UUID,TYPE,DEVICE connection show
 
 ## 2. 安装，先不启用开机守护
 
-把 `linux` 分支源码放到一个由运行用户拥有的固定目录，例如 `~/apps/campus-network-guardian`。以下从项目根目录运行。此过程需要可访问 Ubuntu 软件源、PyPI 和 Playwright 下载源。
+从 [Linux 预览发布页](https://github.com/WHaoxM/campus-network-guardian/releases/tag/v0.3.0-linux.1) 下载 `campus-network-guardian-v0.3.0-linux.1.tar.gz`，把它解压到运行用户的固定目录，或者检出同名 Git 标签。系统服务会引用这个目录，启用后不要只移动目录而不更新服务。以下示例假设归档已下载到当前目录：
+
+```bash
+mkdir -p "$HOME/apps"
+tar -xzf campus-network-guardian-v0.3.0-linux.1.tar.gz -C "$HOME/apps"
+cd "$HOME/apps/campus-network-guardian"
+```
+
+归档只含程序、配置样例和安装说明，不是离线包。以下从项目根目录运行，需要访问 Ubuntu 软件源、PyPI 和 Playwright 下载源。
 
 ```bash
 sudo apt update
@@ -61,10 +69,10 @@ systemctl status campus-guardian.service --no-pager
 
 ## 更新与卸载
 
-更新时先停服务，在**同一个项目目录**更新 `linux` 分支，再执行 `./suse-linux setup`、`check`、`observe` 后启动服务。保留 `app/.env`、`app/config/{campus,browser_login}.linux.toml` 和 `app/runtime/linux-campus/schedule.json`。安装器不会套用 Windows 的安装状态，也不会迁移 Windows 账号或时段。
+更新时先停止服务。在**同一个项目目录**更新到新发布标签；如果用归档安装，按新版本发布页的说明将新版程序替换到原目录。先保留 `app/.env`、`app/config/{campus,browser_login}.linux.toml` 和 `app/runtime/linux-campus/schedule.json`。再执行 `./suse-linux setup`、`check`、`observe` 后启动服务。安装器不会套用 Windows 的安装状态，也不会迁移 Windows 账号或时段。
 
 卸载先 `sudo systemctl disable --now campus-guardian.service`，删除已安装的这一个 service 文件并执行 `sudo systemctl daemon-reload`；确认不需要再使用账号和时段后，才清理项目内的本地数据。NetworkManager 中系统保存的 SUSE 配置不归守护器管理。
 
 ## 当前验证边界
 
-回环演练可用 `python tests/e2e_linux_guardian.py --work-dir <临时目录>` 复跑，需安装项目 Linux Python 依赖和 Chromium。它使用真实 Chromium 和测试门户验证时段、重连决策、路由变化及表单提交流程，无需传入校园网账号。它不能代替服务器上的网卡、授权、真实门户和开机测试。
+从 Git 检出源码后，可用 `python tests/e2e_linux_guardian.py --work-dir <已存在的临时目录>` 复跑回环演练，需安装项目 Linux Python 依赖和 Chromium。它使用真实 Chromium 和测试门户验证时段、重连决策、路由变化及表单提交流程，无需传入校园网账号。它不能代替服务器上的网卡、授权、真实门户和开机测试。

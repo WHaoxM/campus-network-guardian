@@ -1,29 +1,24 @@
 <img src="docs/media/icon.png" width="64" height="64" align="right" alt="SUSE 校园网守护">
 
-# SUSE 校园网守护
+# SUSE 校园网守护 · Linux
 
-电脑留在实验室、寝室或教室，不用每天跑回去登录校园网。它在你设定的时段内自动接入或恢复 SUSE，让已经开机、配好远程工具的电脑重新可达。
+把 Ubuntu 服务器留在实验室或宿舍时，不用每天手动登录校园网。守护器只在你选定的时段内恢复四川轻化工大学的 **SUSE** Wi‑Fi 和门户认证，无需桌面或 Microsoft Edge。
 
-**目前只适配四川轻化工大学 SUSE 校园网。** 原本是自己在用，开源给有同样需求的同学。
+## 下载
 
-## Ubuntu 22.04 服务器
+- **Ubuntu 22.04**：[v0.3.0-linux.1 预览发布页](https://github.com/WHaoxM/campus-network-guardian/releases/tag/v0.3.0-linux.1) · [直接下载 Linux 安装归档](https://github.com/WHaoxM/campus-network-guardian/releases/download/v0.3.0-linux.1/campus-network-guardian-v0.3.0-linux.1.tar.gz)
+- **Windows x64**：请去 [Windows 分支](https://github.com/WHaoxM/campus-network-guardian/tree/main)或下载 [Windows 安装包](https://github.com/WHaoxM/campus-network-guardian/releases/latest)，不要使用 Linux 归档。
 
-在 `linux` 分支使用[服务器安装说明](docs/LINUX.md)。这一版不需要桌面，使用无头 Chromium 完成 SUSE 门户认证，由 systemd 在后台运行。**Linux 没有发布安装包；下面的 Windows ZIP 不适用于 Ubuntu。**
+## 开始使用
 
-## Windows 新电脑怎么装
+先确认目标无线网卡由 **NetworkManager** 管理，并用系统现有的方式手动连一次 SUSE、保存配置。网卡显示 `unmanaged` 或由 `systemd-networkd` 管理时，不要通过 SSH 切换网络管理器。
 
-适用 **64 位 Windows（x64）**。电脑需要 Microsoft Edge 和 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/concepts/distribution)。v0.3.0 起只下载一个 ZIP；Python 和 Playwright 已在包内，不用自己安装、改 PATH 或运行 pip。
+1. 把归档解压到一个固定目录，按[安装说明](docs/LINUX.md)准备系统依赖，再以普通用户运行 `./suse-linux setup`。**这不是离线包**：首次安装会联网下载 Python 依赖和无头 Chromium，安装到项目自己的 `app/runtime/`。
+2. 按说明填写网卡和本地账号，自己设定周一到周日的守护时间（北京时间）。第一次不设时段就不执行自动恢复。
+3. 先运行 `./suse-linux check` 和 `./suse-linux observe`。确认网卡和环境后，再按安装说明试跑并启用 systemd 开机守护。
 
-1. [下载最新 Windows x64 安装包](https://github.com/WHaoxM/campus-network-guardian/releases/latest)，**完整解压**后双击解压出来的 `suse.cmd`。不要在 ZIP 预览窗口里直接运行。
-2. 选一个与解压目录互不包含的空文件夹作为**安装目录**，例如 `D:\Apps\CampusNetworkGuardian`。窗口打开后，以后都从**安装目录**里的 `suse.cmd` 打开，不再依赖原来的解压目录。
-3. 用 Windows 手动连一次 **SUSE**，让系统记住它。在程序里填校园网账号和密码，点 **设置时段**，按北京时间选星期和起止时间。点 **保存并开启守护**，用当前 Windows 用户确认系统权限提示。之后可从系统托盘打开，在「状态 → 守护时段」修改。
+已联网不重复登录，到点不主动下线。有其他默认路由时不会自动重连；提交账号之前还会检查门户流量是否走指定的 SUSE 网卡。
 
-没连 Wi‑Fi、也没有外网时，守护器先连接已保存的 SUSE，再按需登录。**连着其他 Wi‑Fi 不抢占，已经联网不重登，到点也不主动下线。**
+**验证状态：**已在 Ubuntu 22.04 x86_64（WSL）使用真实 Chromium 和本地测试门户走通守护流程。真实无线网卡、学校门户和开机自启仍待实机验证。
 
-## 已经装了 v0.2.5
-
-运行**新版解压目录**里的 `suse.cmd`，选**原安装目录**（包含旧 `suse.cmd` 和 `app` 的那一层）。不要解压覆盖，也不要选新目录另装一份守护。原账号、时段和浏览器配置会保留；保留的 [v0.2.5 发布页](https://github.com/WHaoxM/campus-network-guardian/releases/tag/v0.2.5) 提供旧版下载，不用它覆盖已升级的目录。
-
-[功能演示（旧版界面，Wi‑Fi 和门户为模拟数据）](docs/media/desktop-flow.gif)
-
-[安装与旧版说明](docs/INSTALL.md) · [开发文档](docs/DEVELOPMENT.md) · [安全报告](SECURITY.md) · [MIT 许可证](LICENSE)
+[安装、更新与卸载](docs/LINUX.md) · [开发文档](https://github.com/WHaoxM/campus-network-guardian/blob/linux/docs/DEVELOPMENT.md) · [安全报告](SECURITY.md) · [MIT 许可证](LICENSE)

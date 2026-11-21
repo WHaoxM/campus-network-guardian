@@ -2,10 +2,11 @@
 
 ## 首次使用
 
-- 完整解压 Windows x64 安装包，双击包里的 `suse.cmd`，选择一个空文件夹，可以选 D 盘。以后从安装目录打开，不需要保留解压目录。
-- 包内已有 Python 和 Playwright，不需要改 PATH、运行 pip 或下载 Chromium。电脑还需要 Microsoft Edge 和 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/concepts/distribution)。
-- 手动连上一次 **SUSE**，让 Windows 保存 Wi‑Fi 配置。
-- 填入自己的校园网账号和密码。在「设置时段」里选至少一天，填上起止时间并保存，再点「保存并开启守护」，允许 Windows 权限提示。要加备用账号时再点右上角「账号管理」。
+下载 [v0.3.0 或更新的 Windows x64 ZIP](https://github.com/WHaoxM/campus-network-guardian/releases/latest)。包内已有 Python 和 Playwright，不用改 PATH、运行 pip 或下载 Chromium；电脑仍需要 Microsoft Edge 和 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/concepts/distribution)。
+
+1. 完整解压 ZIP，再双击解压目录里的 `suse.cmd`，不要直接从压缩包预览运行。
+2. 在弹出的目录选择器里选另一个空文件夹（也可以新建），可放 D 盘。**安装目录和解压目录不能互相包含。** 成功后记住安装目录；以后只用安装目录里的 `suse.cmd`，解压目录可以清掉。
+3. 手动连上一次 **SUSE**，让 Windows 保存 Wi‑Fi 配置。填入校园网账号和密码，在「设置时段」里选至少一天并填写起止时间，然后点「保存并开启守护」。已点过保存但取消权限提示时，可在页面点「开启守护」重试，不必重新填写账号。备用账号在「账号管理」里添加。
 
 开启后，计划任务负责启动后台守护；登录 Windows 后可从托盘打开窗口。关窗口不会停止守护。网络是否真的恢复以状态页为准；无人登录时的开机恢复取决于该电脑的 Windows 运行环境。
 

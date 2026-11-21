@@ -32,6 +32,9 @@ def bundled_files():
                         or "\\" in entry.filename or stat.S_ISLNK(entry.external_attr >> 16)):
                     raise ValueError(f"Unexpected runtime archive member: {entry.filename}")
                 if index and relative.parts[0].endswith(".data"):
+                    # Runtime does not compile or link against wheel headers.
+                    if len(relative.parts) > 2 and relative.parts[1] == "headers":
+                        continue
                     raise ValueError(f"Wheel requires unsupported installation layout: {entry.filename}")
                 prefix = "app/runtime/python" + ("/site-packages" if index else "")
                 installed = f"{prefix}/{relative}"

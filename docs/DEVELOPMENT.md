@@ -30,7 +30,32 @@ flowchart LR
 
 账号文件以明文保存在当前 Windows 用户、SYSTEM 和管理员可访问的受限目录，以便同一用户的 S4U 任务读取；禁止提交、上传或把运行目录打包。密码不经命令行参数、日志或状态快照。守护器每轮读取最新账号，提交前还检查该账号未被修改或删除。
 
-守护时段沿用已有 WebView2 本地消息和受限目录（与状态快照同目录的 `schedule.json`）。桌面校验后落盘；后台每轮读取，在 Wi-Fi 或认证动作前复核，心跳回传已读取的时段版本。新安装没有默认时段；仅无自定义文件时读取本机旧版 TOML 的 `schedule.windows`，自定义文件无效时仅观测，不回退到旧时段。周时段界面参考 [Cal.com](https://mobbin.com/screens/599f0196-e1bc-4fde-8706-0c49b3856755) 和 [HoneyBook](https://mobbin.com/screens/de3164f7-d829-403c-bd7c-00f064bef12b) 的星期开关与并排时间栏，未复用代码或图片。
+守护时段沿用已有 WebView2 本地消息和受限目录（与状态快照同目录的 `schedule.json`）。桌面校验后落盘；后台每轮读取，在 Wi-Fi 或认证动作前复核，心跳回传已读取的时段版本。新安装没有默认时段；仅无自定义文件时读取本机旧版 TOML 的 `schedule.windows`，自定义文件无效时仅观测，不回退到旧时段。
+
+## 桌面界面
+
+`app/desktop/ui/index.html` 承载状态、日志、首次设置和账号管理，由 `app/desktop/status-view.js` 接现有本地桥接。 `app/desktop/ui/style.css` 管理中性色、文字层级和实底分组，`schedule-editor.js` 只编辑日期、时间和复制草稿。 `glass-navigation.js` 与 `glass-controls.js` 把现有导航、按钮、开关接给原版玻璃控件，宿主事件仍沿用原动作。不改守护后台、数据格式、北京时间或跨日规则。
+
+| 界面 | 参考与复用边界 |
+| --- | --- |
+| 状态页 | [Gentler Streak 的 iOS 设置](https://mobbin.com/screens/ca366da8-1c89-41cb-96c8-5805528dc313)；普通内容纵向分组，不给状态、操作和日志做独立玻璃卡片。 |
+| 日志页 | [1Password](https://mobbin.com/screens/a5632ec1-f072-43e2-8f2b-ad047df4ca04)；筛选置顶，时间单列；沿用五种过滤。 |
+| 首次设置 | [Amplitude](https://mobbin.com/screens/75c3b094-1130-49c3-9236-c13ee08cff8e)；居中单列表单，保留时段入口和单个主操作。 |
+| 账号管理 | [Proton](https://mobbin.com/screens/1cbd9ced-59a6-4d30-b880-2514c9fe35a4)；账号逐行列出，添加动作放在列表下，只显示尾号。 |
+| 守护时段 | [Lyssna](https://mobbin.com/screens/271e4e87-c20f-4738-bbf4-e856baa3ca6e)；左侧开关、中间时间下拉、右侧复制。只改变选中日期的草稿，可开启原来未设置的日期，保存后才写入。 |
+
+以 [Apple 的内容层/控制层](https://developer.apple.com/design/human-interface-guidelines/materials) 为材质参考：中性实底承载正文、日志、表单；悬浮导航、主要操作按钮、时段开关和浮层直接使用 [glassy-liquid](https://github.com/9und30/glassy-liquid) 的 Web Components。源模块和 MIT 许可见 [UPSTREAM.md](../app/desktop/ui/vendor/glassy-liquid/UPSTREAM.md)，随程序本地加载；不引用 Apple 或 Mobbin 的图像。原生控件仍为加载失败时的回退。折射限于 WebView2 窗口内；高对比度和减少透明使用实底。
+
+窗口标识沿用项目的 `campus-guardian.ico`；Wi‑Fi、显隐密码、复制等小图标来自 [Lucide 0.468.0](../app/desktop/ui/icons/lucide/UPSTREAM.md)。保留原版 SVG，随程序离线加载，不手绘路径。
+
+```mermaid
+flowchart LR
+  A["ui/index.html · 页面与原生输入"] --> B["glass-navigation.js / glass-controls.js · 连接控件"]
+  B --> V["vendor/glassy-liquid · 原版导航、动作、开关、表面"]
+  A --> C["schedule-editor.js · 选择和复制草稿"]
+  C -- 保存 --> D["status-view.js · 现有 WebView2 桥接"]
+  D --> E["campus_schedule.py · 既有校验与持久化"]
+```
 
 从仓库根目录运行下列命令；构建需要 [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)。源码运行环境与桌面产物在 `app/`，SDK 缓存、测试报告和候选 ZIP 在根目录的 `runtime/`，均不提交。
 
@@ -40,7 +65,7 @@ flowchart LR
 .\scripts\demo.ps1 -SkipBuild
 ```
 
-演练使用真实 EXE、WebView2 和本机回环门户，不触碰原有校园网。短流程覆盖首次选择守护时段、跨日及重叠校验、在线修改时段并停止待提交的登录，以及账号管理、恢复、日志与暂停。测试模式不会登记真实 Windows 任务；S4U 和实际门户需在部署机单独验收。要验证保留的旧时段与账号轮换，可单独运行：
+演练使用真实 EXE、WebView2 和本机回环门户，不触碰原有校园网。短流程覆盖首次选择并复制守护时段、跨日及重叠校验、在线修改时段并停止待提交的登录，以及账号管理、恢复、日志与暂停。测试模式不会登记真实 Windows 任务；S4U 和实际门户需在部署机单独验收。要验证保留的旧时段与账号轮换，可单独运行：
 
 ```powershell
 .\app\.venv\Scripts\python.exe -X utf8 tests/e2e_campus_maintenance.py --config app/config/campus.toml --portal tests/data/browser_journey.json --html tests/data/browser_portal.html --journey tests/data/campus_journey.json --output runtime/guardian-e2e.json
@@ -52,10 +77,10 @@ flowchart LR
 .\app\.venv\Scripts\python.exe -X utf8 tests/e2e_desktop.py --exe app/runtime/desktop/CampusGuardian.exe --output runtime/desktop-e2e
 ```
 
-打包前先提交公开源码、重新构建，再运行 `python scripts/package.py --version 0.2.3`。ZIP 按运行文件清单生成，第三方许可在 `app/licenses/`。测试、演练与开发脚本只留源码，不随包发；发布方应从实际解压包验证入口，而不是让下载者跑测试。仅验收当前布局时，可附 `--output-dir runtime/layout-verification`，不覆盖现有发行文件。
+打包前先提交公开源码、重新构建，再运行 `python scripts/package.py --version 0.2.4`。ZIP 按运行文件清单生成，第三方许可在 `app/licenses/`。测试、演练与开发脚本只留源码，不随包发；发布方应从实际解压包验证入口，而不是让下载者跑测试。仅验收当前布局时，可附 `--output-dir runtime/layout-verification`，不覆盖现有发行文件。
 
 ```powershell
-.\app\.venv\Scripts\python.exe -X utf8 tests/e2e_distribution.py --zip runtime/release/CampusNetworkGuardian-0.2.3-win-x64.zip --output runtime/distribution-e2e
+.\app\.venv\Scripts\python.exe -X utf8 tests/e2e_distribution.py --zip runtime/release/CampusNetworkGuardian-0.2.4-win-x64.zip --output runtime/distribution-e2e
 ```
 
 `docs/media/` 只保留 README 用到的 GIF 和图标；逐帧截图与演练报告留在本机 `runtime/`，不提交。`scripts/render_demo.py` 从回环演练的真实窗口截图生成 GIF；Wi‑Fi 状态和门户均为模拟。提交 issue 时仅附不含身份的结果代码与复现情况。

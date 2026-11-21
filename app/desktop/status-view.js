@@ -1,8 +1,9 @@
-"use strict";
+import { createScheduleEditor } from "./schedule-editor.js";
+import { focusControl } from "./glass-controls.js";
 
 (() => {
   const byId = (id) => document.getElementById(id);
-  const dot = document.querySelector(".online-dot");
+  const overview = document.querySelector(".overview");
   const date = new Intl.DateTimeFormat("zh-CN", {
     timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit", hour: "2-digit",
     minute: "2-digit", hourCycle: "h23",
@@ -17,15 +18,9 @@
     starting: "启动中", missing: "尚未收到状态", stale: "状态已过期",
     unavailable: "守护未运行", unconfirmed: "无法核验守护", running: "运行中", heartbeat: "心跳正常",
   };
-  document.querySelector(".titlebar").hidden = true;
   byId("tab-logs").hidden = false;
   byId("pause").hidden = false;
   byId("pause").disabled = true;
-  document.body.classList.add("desktop-view");
-  document.querySelector(".demo-note").hidden = true;
-  Object.assign(document.body.style, { padding: "0", background: "var(--surface)", display: "block" });
-  Object.assign(byId("window").style, { width: "100%", border: "0", borderRadius: "0", boxShadow: "none" });
-  dot.style.background = "var(--edge)";
 
   const tabs = [...document.querySelectorAll('[role="tab"]')];
   const filters = [...document.querySelectorAll("[data-filter]")];
@@ -57,6 +52,7 @@
       showTab(tabs[next], true);
     });
   }
+  byId("recent-log-open").addEventListener("click", () => showTab(byId("tab-logs"), true));
   function renderLogs() {
     const visible = events.filter((event) => activeFilter === "all" ||
       (!event.repeat && (activeFilter === "important" ? event.important : event.group === activeFilter)));
@@ -105,7 +101,9 @@
       : isOffline ? "SUSE 外网不可用"
       : snapshot.link === "suse" ? "SUSE 已连接，外网待确认"
       : links[snapshot.link] ?? links.unknown;
-    dot.style.background = isOnline ? "var(--online)" : isOffline ? "#bb5541" : "var(--edge)";
+    overview.dataset.connection = isOnline ? "online" : isOffline ? "offline" : "unknown";
+    overview.toggleAttribute("data-no-wifi", live && snapshot?.link === "none");
+    byId("guardian-state").dataset.live = String(live);
     const checkedAt = Date.parse(snapshot?.last_check_at);
     byId("last-checked").textContent = Number.isFinite(checkedAt)
       ? `${live && probe_fresh ? "最近检查" : "上次观测"} ${date.format(checkedAt)}`
@@ -137,9 +135,7 @@
 
   if (!window.chrome?.webview) return;
   const dialog = byId("account-dialog");
-  const scheduleDialog = byId("schedule-dialog");
-  const scheduleDays = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
-  let schedule = null, scheduleOpener = null;
+  let schedule = null;
   let rows = [], inFlight = "", target = null, editAction = "add";
   const feedback = {
     setup_required: "请从解压目录运行 suse.cmd 完成环境准备。",
@@ -174,110 +170,10 @@
     if (status.textContent !== statusSummary) status.textContent = statusSummary;
   }
 
-  const clockPattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
-  const scheduleInputs = scheduleDays.map((day) => {
-    const row = document.createElement("div");
-    row.className = "schedule-day";
-    const label = document.createElement("label");
-    const toggle = Object.assign(document.createElement("input"), { type: "checkbox" });
-    label.append(toggle, day);
-    const field = (part, placeholder) => {
-      const input = Object.assign(document.createElement("input"), { type: "text", placeholder, maxLength: 5 });
-      input.setAttribute("aria-label", `${day}${part}时间`);
-      input.autocomplete = "off";
-      input.spellcheck = false;
-      return input;
-    };
-    const start = field("开始", "时:分");
-    const end = field("结束", "时:分");
-    end.title = "全天可填写 00:00 至 24:00";
-    const divider = element("span", "–");
-    divider.setAttribute("aria-hidden", "true");
-    const endField = document.createElement("div");
-    endField.className = "schedule-end";
-    const next = element("span", "次日");
-    endField.append(end, next);
-    const off = element("span", "无独立时段");
-    off.className = "schedule-off muted";
-    function update() {
-      off.hidden = toggle.checked;
-      start.hidden = endField.hidden = divider.hidden = !toggle.checked;
-      const valid = clockPattern.test(start.value) && clockPattern.test(end.value);
-      next.hidden = !valid || end.value >= start.value;
-      if (next.hidden) end.removeAttribute("aria-description");
-      else end.setAttribute("aria-description", "次日结束");
-    }
-    function changed() {
-      byId("schedule-feedback").textContent = "";
-      start.removeAttribute("aria-invalid");
-      end.removeAttribute("aria-invalid");
-      update();
-    }
-    toggle.addEventListener("change", changed);
-    start.addEventListener("input", changed);
-    end.addEventListener("input", changed);
-    row.append(label, start, divider, endField, off);
-    byId("schedule-days").append(row);
-    return { toggle, start, end, update };
-  });
-  function openSchedule(opener) {
-    if (inFlight) return;
-    scheduleOpener = opener;
-    scheduleDialog.showModal();
-    byId("schedule-feedback").textContent = "正在读取时段…";
-    byId("schedule-days").hidden = true;
-    sendAccount("schedule_read");
-  }
-  function fillSchedule() {
-    scheduleInputs.forEach(({ toggle, start, end, update }, i) => {
-      const value = schedule?.windows?.[i];
-      toggle.checked = Boolean(value);
-      [start.value, end.value] = value?.split("-") ?? ["", ""];
-      start.removeAttribute("aria-invalid");
-      end.removeAttribute("aria-invalid");
-      update();
-    });
-    byId("schedule-days").hidden = false;
-  }
-  function scheduleBusy(busy) {
-    byId("schedule-save").disabled = busy;
-    byId("schedule-close").disabled = busy;
-    byId("schedule-cancel").disabled = busy;
-    for (const { toggle, start, end } of scheduleInputs) toggle.disabled = start.disabled = end.disabled = busy;
-  }
-  byId("schedule-open").addEventListener("click", (e) => openSchedule(e.currentTarget));
-  byId("first-schedule-open").addEventListener("click", (e) => openSchedule(e.currentTarget));
-  byId("schedule-close").addEventListener("click", () => scheduleDialog.close());
-  byId("schedule-cancel").addEventListener("click", () => scheduleDialog.close());
-  scheduleDialog.addEventListener("cancel", (e) => {
-    if (inFlight.startsWith("schedule_")) e.preventDefault();
-  });
-  scheduleDialog.addEventListener("close", () => scheduleOpener?.focus());
-  byId("schedule-form").addEventListener("submit", (event) => {
-    event.preventDefault();
-    if (inFlight || byId("schedule-days").hidden) return;
-    const windows = [];
-    for (const [i, { toggle, start, end }] of scheduleInputs.entries()) {
-      if (!toggle.checked) { windows.push(null); continue; }
-      start.value = start.value.trim();
-      end.value = end.value.trim();
-      const bad = !clockPattern.test(start.value) ? start
-        : !(clockPattern.test(end.value) || end.value === "24:00") || start.value === end.value ? end : null;
-      if (bad) {
-        byId("schedule-feedback").textContent = `${scheduleDays[i]}：${feedback.invalid_windows}`;
-        bad.setAttribute("aria-invalid", "true");
-        bad.focus();
-        return;
-      }
-      windows.push(`${start.value}-${end.value}`);
-    }
-    if (!windows.some(Boolean)) {
-      byId("schedule-feedback").textContent = feedback.schedule_needs_day;
-      scheduleInputs[0].toggle.focus();
-      return;
-    }
-    byId("schedule-feedback").textContent = "正在保存…";
-    sendAccount("schedule_save", { windows });
+  const scheduleEditor = createScheduleEditor({
+    request: sendAccount,
+    isBusy: () => Boolean(inFlight),
+    messages: feedback,
   });
 
   function notify(message = "", inDialog = false) {
@@ -290,7 +186,7 @@
   function sendAccount(action, data = {}) {
     if (inFlight) return;
     inFlight = action;
-    if (action.startsWith("schedule_")) scheduleBusy(true);
+    if (action.startsWith("schedule_")) scheduleEditor.setBusy(true);
     const first = byId("first-submit");
     first.disabled = true;
     first.textContent = action === "first" ? "正在保存并开启…" : "保存并开启守护";
@@ -336,7 +232,7 @@
       });
       if (row.primary) actions.append(change);
       else {
-        const more = textButton("⋯", () => {
+        const more = textButton("", () => {
           const show = menu.hidden;
           for (const other of dialog.querySelectorAll(".account-more-menu")) {
             other.hidden = true;
@@ -346,6 +242,10 @@
           more.setAttribute("aria-expanded", String(show));
         });
         more.classList.add("account-more");
+        const moreIcon = document.createElement("span");
+        moreIcon.className = "ui-icon icon-more";
+        moreIcon.setAttribute("aria-hidden", "true");
+        more.append(moreIcon);
         more.setAttribute("aria-label", "备用账号更多操作");
         more.setAttribute("aria-expanded", "false");
         const menu = document.createElement("div");
@@ -372,24 +272,14 @@
       renderScheduleSummary();
     }
     if (action.startsWith("schedule_")) {
-      scheduleBusy(false);
-      if (data.error || !data.schedule) {
-        byId("schedule-feedback").textContent = feedback[data.error] ?? "无法读取或保存时段，请重试。";
-        byId("schedule-save").disabled = action === "schedule_read";
-      } else if (action === "schedule_save") {
-        if (!rows.length) notify();
-        scheduleDialog.close();
-      } else {
-        fillSchedule();
-        byId("schedule-feedback").textContent = schedule.source === "invalid" ? "原时段无法读取，请重新设置。" : "";
-        scheduleInputs[0].toggle.focus();
-      }
+      if (action === "schedule_save" && data.schedule && !data.error && !rows.length) notify();
+      scheduleEditor.receive(action, data);
       return;
     }
     const message = data.error && (feedback[data.error] ?? "无法读取或保存账号，未显示任何凭证。");
     if (Array.isArray(data.rows)) {
       rows = data.rows;
-      byId("account-open").hidden = false;
+      byId("account-open").hidden = rows.length === 0;
       byId("account-setup").hidden = rows.length !== 0;
       byId("monitor-content").hidden = rows.length === 0;
       byId("schedule-entry").hidden = rows.length === 0;
@@ -403,7 +293,7 @@
     } else if (dialog.open) {
       if (!message) displayDialog("list");
       notify(message || "已保存。", true);
-      if (!message) byId("add-account").focus();
+      if (!message) focusControl(byId("add-account"));
     }
   }
 
@@ -421,7 +311,7 @@
   byId("account-close").addEventListener("click", () => dialog.close());
   dialog.addEventListener("close", () => {
     byId("edit-account").reset();
-    byId("account-open").focus();
+    focusControl(byId("account-open"));
   });
   byId("first-reveal").addEventListener("click", ({ currentTarget: button }) => {
     const input = byId("first-password");
@@ -440,7 +330,7 @@
       return;
     }
     if (!scheduleConfigured()) {
-      openSchedule(byId("first-schedule-open"));
+      scheduleEditor.open(byId("first-schedule-open"));
       return;
     }
     sendAccount("first", { username, password: input.value });
@@ -452,7 +342,7 @@
   });
   byId("enable-guardian").addEventListener("click", () => {
     if (!scheduleConfigured()) {
-      openSchedule(byId("schedule-open"));
+      scheduleEditor.open(byId("schedule-open"));
       return;
     }
     sendAccount("activate");

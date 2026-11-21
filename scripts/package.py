@@ -14,6 +14,7 @@ PUBLIC_FILES = {
     "docs/media/icon.png": "app/media/icon.png",
     "docs/media/desktop-flow.gif": "app/media/desktop-flow.gif",
     "app/desktop/ui/vendor/glassy-liquid/LICENSE": "app/licenses/glassy-liquid/LICENSE.txt",
+    "app/desktop/ui/icons/lucide/LICENSE": "app/licenses/lucide/LICENSE.txt",
     **{f"app/{name}": f"app/{name}" for name in (
         "setup.ps1", "scripts/suse.ps1", "requirements.txt",
         "browser_login.py", "campus_maintenance.py", "campus_accounts.py", "campus_status.py", "campus_log.py", "campus_schedule.py",
@@ -94,7 +95,10 @@ def main():
         for file in sorted(build.rglob("*")):
             if file.is_file() and file.suffix.lower() not in {".pdb", ".xml"}:
                 relative = PurePosixPath(file.relative_to(build).as_posix())
-                if relative.suffix.lower() not in {".dll", ".exe", ".json", ".html", ".js", ".css", ".dat", ".bin"}:
+                is_icon = relative == PurePosixPath("ui/media/campus-guardian.ico") or (
+                    relative.parent == PurePosixPath("ui/icons/lucide") and relative.suffix == ".svg"
+                )
+                if not is_icon and relative.suffix.lower() not in {".dll", ".exe", ".json", ".html", ".js", ".css", ".dat", ".bin"}:
                     raise SystemExit(f"Unexpected file in desktop build: {relative}")
                 if relative.suffix.lower() == ".json" and relative.name not in {
                     "desktop.json", "CampusGuardian.deps.json", "CampusGuardian.runtimeconfig.json",

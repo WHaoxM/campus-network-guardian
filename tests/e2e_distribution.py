@@ -115,10 +115,21 @@ def run(archive_path, output):
                 page = browser.contexts[0].pages[0]
                 expect(page.get_by_role("heading", name="添加校园网账号")).to_be_visible(timeout=15000)
                 expect(page.get_by_role("button", name="保存并开启守护")).to_be_visible()
+                expect(page.get_by_role("button", name="账号管理")).to_be_hidden()
+                page.locator(".app-mark").evaluate("(image) => image.decode()")
+                reveal = page.get_by_role("button", name="显示密码")
+                expect(reveal.locator(".ui-icon")).to_have_css("mask-image", re.compile(r"/icons/lucide/eye\.svg"))
+                reveal.click()
+                expect(page.get_by_role("button", name="隐藏密码").locator(".ui-icon")).to_have_css(
+                    "mask-image", re.compile(r"/icons/lucide/eye-off\.svg"))
+                if not (app / "licenses/lucide/LICENSE.txt").is_file():
+                    raise RuntimeError("Lucide license is missing from the installed package")
+                checks.append("desktop_uses_existing_app_icon_and_local_licensed_icon_set")
                 expect(page.locator("#first-schedule-summary")).to_have_text("尚未设置")
                 page.get_by_role("button", name="设置时段").click()
                 editor = page.get_by_role("dialog", name="守护时段")
-                editor.get_by_role("checkbox", name="周四").check()
+                thursday = editor.get_by_role("switch", name="周四")
+                thursday.click()
                 start = editor.get_by_role("textbox", name="周四开始时间")
                 end = editor.get_by_role("textbox", name="周四结束时间")
                 expect(start).to_have_value("")

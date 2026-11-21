@@ -158,6 +158,7 @@ def run(exe, output, preview):
             page.on("pageerror", lambda error: errors.append(str(error)))
             ui_button = lambda name: page.get_by_role("button", name=name, exact=True)
             expect(page.get_by_role("heading", name="添加校园网账号")).to_be_visible(timeout=12000)
+            expect(ui_button("保存并开启守护")).to_have_js_property("tagName", "GLASS-BUTTON")
             expect(page.get_by_text("开启后，电脑开机时会自动运行。")).to_be_in_viewport()
             page.screenshot(path=output / "desktop-first-run.png", animations="disabled")
             first = page.locator("#first-account")
@@ -170,15 +171,28 @@ def run(exe, output, preview):
             expect(page.locator("#first-schedule-summary")).to_have_text("尚未设置")
             ui_button("保存并开启守护").click()
             hours = page.get_by_role("dialog", name="守护时段")
-            expect(hours.get_by_role("checkbox", name="周四")).not_to_be_checked()
+            thursday = hours.get_by_role("switch", name="周四")
+            try:
+                expect(thursday).to_be_visible(timeout=12000)
+            except AssertionError as exc:
+                raise RuntimeError(f"First setup could not load the schedule editor: {hours.aria_snapshot()}; {errors}") from exc
+            expect(thursday).to_have_js_property("tagName", "GLASS-SWITCH")
+            expect(thursday).to_have_attribute("aria-checked", "false")
             schedule_data = journey["desktop_schedule"]
             save_hours = ui_button("保存时段")
             schedule_note = hours.get_by_role("status")
             save_hours.click()
             expect(schedule_note).to_contain_text("请至少选一天")
 
+            def set_day(day, checked):
+                switch = hours.get_by_role("switch", name=day, exact=True)
+                expected = "true" if checked else "false"
+                if switch.get_attribute("aria-checked") != expected:
+                    switch.press("Space")
+                expect(switch).to_have_attribute("aria-checked", expected)
+
             def select_day(day, times):
-                hours.get_by_role("checkbox", name=day).check()
+                set_day(day, True)
                 start = hours.get_by_role("textbox", name=day + "开始时间")
                 end = hours.get_by_role("textbox", name=day + "结束时间")
                 expect(start).to_have_value("")
@@ -186,13 +200,56 @@ def run(exe, output, preview):
                 start.fill(times[0])
                 end.fill(times[1])
 
-            select_day("周四", schedule_data["thursday"])
-            select_day("周五", schedule_data["friday"])
+            # Set a weekday once, copy it to four unchecked days, and leave
+            # both a disabled and a separately configured weekend day alone.
+            weekdays = ("周一", "周二", "周三", "周四", "周五")
+            work_start, work_end = schedule_data["copy_weekday"]
+            select_day("周日", schedule_data["copy_weekend"])
+            set_day("周一", True)
+            ui_button("选择周一开始时间").press("Enter")
+            times = page.get_by_role("listbox", name="周一开始时间")
+            expect(times).to_be_visible()
+            times.get_by_role("option", name=work_start, exact=True).click()
+            expect(times).to_be_hidden()
+            hours.get_by_role("textbox", name="周一结束时间").fill(work_end)
+            ui_button("复制周一时段").click()
+            copy = page.get_by_role("dialog", name="复制时段到")
+            expect(copy.get_by_role("checkbox", name="周一")).to_be_disabled()
+            expect(copy.get_by_role("button", name="应用")).to_be_disabled()
+            for day in weekdays[1:]:
+                copy.get_by_role("checkbox", name=day).check()
+            page.screenshot(path=output / "desktop-schedule-copy.png", animations="disabled")
+            copy.get_by_role("button", name="应用").click()
+            expect(copy).to_be_hidden()
+            for day in weekdays:
+                expect(hours.get_by_role("switch", name=day)).to_have_attribute("aria-checked", "true")
+                expect(hours.get_by_role("textbox", name=day + "开始时间")).to_have_value(work_start)
+                expect(hours.get_by_role("textbox", name=day + "结束时间")).to_have_value(work_end)
+            expect(hours.get_by_role("switch", name="周六")).to_have_attribute("aria-checked", "false")
+            expect(hours.get_by_role("textbox", name="周日开始时间")).to_have_value(schedule_data["copy_weekend"][0])
+            expect(hours.get_by_role("textbox", name="周日结束时间")).to_have_value(schedule_data["copy_weekend"][1])
+            schedule_file = root / "watch/desktop/schedule.json"
+            if schedule_file.exists():
+                raise RuntimeError("Copy applied to persisted hours before Save")
+            save_hours.click()
+            expect(hours).to_be_hidden()
+            expect(page.locator("#first-schedule-summary")).to_have_text("每周 6 天 · 北京时间")
+            merged = json.loads(schedule_file.read_text(encoding="utf-8"))["windows"]
+            if merged != [f"{work_start}-{work_end}"] * 5 + [None, "-".join(schedule_data["copy_weekend"])]:
+                raise RuntimeError("Save did not persist just the drafted working days and the unchanged weekend")
+            checks.append("pick_time_once_copy_only_selected_days_and_apply_only_after_save")
+
+            ui_button("设置时段").click()
+            for day in (*weekdays[:3], "周日"):
+                set_day(day, False)
+            for day, key in (("周四", "thursday"), ("周五", "friday")):
+                for label, value in zip(("开始", "结束"), schedule_data[key]):
+                    hours.get_by_role("textbox", name=f"{day}{label}时间").fill(value)
             expect(hours.locator(".schedule-end span:visible")).to_have_text("次日")
             select_day("周六", schedule_data["saturday_overlap"])
             save_hours.click()
             expect(schedule_note).to_contain_text("跨日时段与次日的开始时间重叠")
-            hours.get_by_role("checkbox", name="周六").uncheck()
+            set_day("周六", False)
             page.screenshot(path=output / "desktop-schedule.png", animations="disabled")
             save_hours.click()
             expect(hours).to_be_hidden()
@@ -240,7 +297,7 @@ def run(exe, output, preview):
             ui_button("保存").click()
             expect(pane.get_by_role("heading", name="账号管理")).to_be_visible()
             _, backup_user, backup_password = spec["backup"]
-            ui_button("＋ 添加备用账号").click()
+            ui_button("添加备用账号").click()
             pane.get_by_label("校园网账号").fill(backup_user)
             pane.get_by_label("密码", exact=True).fill(backup_password)
             ui_button("保存").click()
@@ -279,7 +336,7 @@ def run(exe, output, preview):
             expect(accounts.first).to_contain_text(expected_tail(spec["username"]))
             # Keep one backup for the next outage; the verified main account
             # enters cooldown and should not be retried in its place.
-            ui_button("＋ 添加备用账号").click()
+            ui_button("添加备用账号").click()
             pane.get_by_label("校园网账号").fill(backup_user)
             pane.get_by_label("密码", exact=True).fill(backup_password)
             ui_button("保存").click()
@@ -336,7 +393,8 @@ def run(exe, output, preview):
             status_tab = page.get_by_role("tab", name="状态", exact=True)
             logs = page.locator("#log-list")
             button = lambda name: page.get_by_role("button", name=name, exact=True)
-            logs_tab.click()
+            ui_button("查看日志").click()
+            expect(logs_tab).to_have_attribute("aria-selected", "true")
             for category, text in (("重要", "门户与外网均验证成功"), ("登录", "开始尝试登录"),
                                    ("Wi-Fi", "SUSE 外网在线"), ("时段", "已进入自动登录和恢复时段"),
                                    ("全部", "守护已启动")):

@@ -4,31 +4,27 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SUSE 校园网守护</title>
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'sha256-6VS2QfOPrpRdEwAwqTPTpCS6cIeP1wVt07HiahIL35c=' 'sha256-JXec0A+0wHX/xDF5APd7LGwKMkhf4rj5P+XDeDrPuXg='; img-src data:; form-action 'none'; connect-src 'none'; base-uri 'none'">
-  <link rel="icon" href="data:,">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'sha256-6VS2QfOPrpRdEwAwqTPTpCS6cIeP1wVt07HiahIL35c=' 'sha256-JXec0A+0wHX/xDF5APd7LGwKMkhf4rj5P+XDeDrPuXg='; img-src 'self' data:; form-action 'none'; connect-src 'none'; base-uri 'none'">
+  <link rel="icon" href="media/campus-guardian.ico">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="glass-navigation.css">
   <script type="module" src="glass-navigation.js"></script>
-  <script defer src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </head>
 <body>
   <main id="window" class="window" aria-label="校园网守护">
-    <header class="titlebar">
-      <span>校园网守护</span>
-      <div class="window-actions">
-        <button type="button" id="minimize" aria-label="最小化演示窗口"><span class="minus" aria-hidden="true"></span></button>
-        <button type="button" id="close" aria-label="收起演示窗口"><span class="cross" aria-hidden="true"></span></button>
+    <header class="nav-row">
+      <div class="nav-inner">
+        <div class="app-label"><img class="app-mark" src="media/campus-guardian.ico" width="29" height="29" alt=""><span>校园网守护</span></div>
+        <div class="tabs" role="tablist" aria-label="守护器页面">
+          <button type="button" id="tab-status" role="tab" aria-selected="true" aria-controls="panel-status">状态</button>
+          <button type="button" id="tab-logs" role="tab" aria-selected="false" aria-controls="panel-logs" tabindex="-1" hidden>日志</button>
+        </div>
+        <button id="account-open" type="button" class="outline" data-glass-action hidden>账号管理</button>
       </div>
     </header>
-    <div class="nav-row">
-    <div class="tabs" role="tablist" aria-label="守护器页面">
-      <button type="button" id="tab-status" role="tab" aria-selected="true" aria-controls="panel-status">状态</button>
-      <button type="button" id="tab-logs" role="tab" aria-selected="false" aria-controls="panel-logs" tabindex="-1" hidden>日志</button>
-    </div>
-    <button id="account-open" type="button" class="outline account-open" hidden>账号管理</button>
-    </div>
     <section id="panel-status" class="content status-page" role="tabpanel" aria-labelledby="tab-status">
-      <div id="account-setup" class="account-setup" hidden>
+      <div id="account-setup" class="account-setup panel" hidden>
         <h1>添加校园网账号</h1>
         <p class="muted">填写你的四川轻化工大学校园网账号。</p>
         <form id="first-account" novalidate autocomplete="off">
@@ -38,7 +34,7 @@
           <div class="password-input">
             <input id="first-password" type="password" maxlength="256" placeholder="请输入密码" autocomplete="new-password" required>
             <button id="first-reveal" type="button" class="password-reveal" aria-label="显示密码" aria-pressed="false">
-              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M2 12s3.4-6 10-6 10 6 10 6-3.4 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.8"/></svg>
+              <span class="ui-icon icon-eye" aria-hidden="true"></span>
             </button>
           </div>
           <div class="schedule-entry first-schedule">
@@ -46,92 +42,120 @@
               <strong>守护时段</strong>
               <p id="first-schedule-summary" class="muted" aria-live="polite">尚未设置</p>
             </div>
-            <button id="first-schedule-open" type="button" class="outline account-open">设置时段</button>
+            <button id="first-schedule-open" type="button" class="outline" data-glass-action>设置时段</button>
           </div>
-          <button id="first-submit" type="submit" class="primary">保存并开启守护</button>
+          <button id="first-submit" type="submit" class="primary" data-glass-action="primary">保存并开启守护</button>
           <p class="muted">开启后，电脑开机时会自动运行。</p>
         </form>
       </div>
       <div id="account-notice" class="account-notice" hidden>
         <p id="account-feedback" role="status"></p>
-        <button id="enable-guardian" type="button" class="outline account-open" hidden>开启守护</button>
+        <button id="enable-guardian" type="button" class="outline" data-glass-action="primary" hidden>开启守护</button>
       </div>
       <div id="monitor-content">
-      <div class="overview">
-        <div class="connection">
-          <span class="online-dot" aria-hidden="true"></span>
-          <div>
-            <h1 id="connection-heading">尚未取得守护状态</h1>
-            <p id="last-checked" class="muted"></p>
+        <section class="overview" data-connection="unknown" aria-labelledby="connection-heading">
+          <div class="connection">
+            <span class="connection-icon" aria-hidden="true"><span class="ui-icon icon-wifi"></span></span>
+            <div>
+              <h1 id="connection-heading">尚未取得守护状态</h1>
+              <p id="last-checked" class="muted"></p>
+            </div>
           </div>
+          <div class="guardian">
+            <h2>后台守护</h2>
+            <p id="guardian-state">正在读取</p>
+          </div>
+        </section>
+        <div class="status-groups">
+          <section class="control-panel" aria-labelledby="controls-heading">
+            <h2 id="controls-heading" class="group-heading">守护控制</h2>
+            <div class="group-body">
+            <div class="recovery">
+              <div aria-live="polite" class="recovery-labels">
+                <h2 id="recovery-heading">自动恢复</h2>
+                <p id="recovery-detail" class="muted"></p>
+              </div>
+              <button id="pause" type="button" class="outline" data-glass-action hidden>暂停 30 分钟</button>
+            </div>
+            <div id="schedule-entry" class="schedule-entry" hidden>
+              <div>
+                <h2>守护时段</h2>
+                <p id="schedule-summary" class="muted" role="status"></p>
+              </div>
+              <button id="schedule-open" type="button" class="outline" data-glass-action>编辑时段</button>
+            </div>
+            </div>
+          </section>
+          <section class="recent" aria-labelledby="recent-heading">
+            <header class="section-heading">
+              <h2 id="recent-heading" class="group-heading">最近事件</h2>
+              <button id="recent-log-open" type="button" class="text-action">查看日志</button>
+            </header>
+            <div class="group-body">
+              <ol id="recent-list" class="event-list"></ol>
+              <p id="recent-empty" class="log-hint muted" hidden>暂无重要事件</p>
+            </div>
+          </section>
         </div>
-        <div class="guardian">
-          <h2>后台守护</h2>
-          <p id="guardian-state" class="muted">正在读取</p>
-        </div>
-      </div>
-      <div class="recovery">
-        <div aria-live="polite" class="recovery-labels">
-          <h2 id="recovery-heading">自动恢复</h2>
-          <p id="recovery-detail" class="muted"></p>
-        </div>
-        <button id="pause" type="button" class="outline" hidden>暂停 30 分钟</button>
-      </div>
-      <div id="schedule-entry" class="schedule-entry" hidden>
-        <div>
-          <h2>守护时段</h2>
-          <p id="schedule-summary" class="muted" role="status"></p>
-        </div>
-        <button id="schedule-open" type="button" class="outline account-open">编辑时段</button>
-      </div>
-      <section class="recent" aria-labelledby="recent-heading">
-        <h2 id="recent-heading">最近事件</h2>
-        <ol id="recent-list" class="event-list"></ol>
-        <p id="recent-empty" class="log-hint muted" hidden>暂无重要事件</p>
-      </section>
       </div>
     </section>
     <section id="panel-logs" class="content logs-page" role="tabpanel" aria-labelledby="tab-logs" hidden>
-      <div class="filters" role="group" aria-label="日志筛选">
-        <button type="button" data-filter="important" aria-pressed="true">重要</button>
-        <button type="button" data-filter="auth" aria-pressed="false">登录</button>
-        <button type="button" data-filter="wifi" aria-pressed="false">Wi-Fi</button>
-        <button type="button" data-filter="schedule" aria-pressed="false">时段</button>
-        <button type="button" data-filter="all" aria-pressed="false">全部</button>
-      </div>
-      <table class="log-table" aria-label="事件日志">
-        <thead><tr><th scope="col">时间</th><th scope="col">事件</th></tr></thead>
-        <tbody id="log-list"></tbody>
-      </table>
-      <p id="log-hint" class="log-hint muted" aria-live="polite"></p>
+      <h1 class="page-heading">守护日志</h1>
+      <section class="log-surface group-body" aria-label="日志列表">
+        <div class="filters" role="group" aria-label="日志筛选">
+          <button type="button" data-filter="important" aria-pressed="true" data-glass-action="plain">重要</button>
+          <button type="button" data-filter="auth" aria-pressed="false" data-glass-action="plain">登录</button>
+          <button type="button" data-filter="wifi" aria-pressed="false" data-glass-action="plain">Wi-Fi</button>
+          <button type="button" data-filter="schedule" aria-pressed="false" data-glass-action="plain">时段</button>
+          <button type="button" data-filter="all" aria-pressed="false" data-glass-action="plain">全部</button>
+        </div>
+        <table class="log-table" aria-label="事件日志">
+          <thead><tr><th scope="col">时间</th><th scope="col">事件</th></tr></thead>
+          <tbody id="log-list"></tbody>
+        </table>
+        <p id="log-hint" class="log-hint muted" aria-live="polite"></p>
+      </section>
     </section>
-    <dialog id="schedule-dialog" aria-labelledby="schedule-title">
+    <dialog id="schedule-dialog" class="glass" data-glass-layer="22" aria-labelledby="schedule-title">
       <header class="dialog-header">
         <h2 id="schedule-title">守护时段</h2>
-        <button id="schedule-close" type="button" class="dialog-close" aria-label="关闭守护时段">×</button>
+        <button id="schedule-close" type="button" class="dialog-close" aria-label="关闭守护时段"><span class="ui-icon icon-close" aria-hidden="true"></span></button>
       </header>
-      <p id="schedule-help" class="muted">北京时间 · 每周重复。结束早于开始时，守护延续到次日。</p>
       <form id="schedule-form" novalidate aria-describedby="schedule-help">
-        <div class="schedule-columns" aria-hidden="true">
-          <span>星期</span><span>开始</span><span></span><span>结束</span>
-        </div>
-        <div id="schedule-days"></div>
+        <section id="schedule-week" aria-labelledby="schedule-week-title" hidden>
+          <div class="schedule-week-heading">
+            <h3 id="schedule-week-title">每周时段</h3>
+            <span class="muted">北京时间</span>
+          </div>
+          <div id="schedule-days"></div>
+        </section>
+        <p id="schedule-help" class="muted">结束早于开始时会延续到次日。全天填 00:00–24:00。</p>
         <p id="schedule-feedback" class="schedule-feedback" role="status"></p>
+        <div id="schedule-time-picker" class="glass schedule-popover schedule-time-picker" role="listbox" popover></div>
+        <div id="schedule-copy-picker" class="glass schedule-popover schedule-copy-picker"
+             role="dialog" aria-labelledby="schedule-copy-title" data-glass-layer="12" data-glass-density="high" popover>
+          <h3 id="schedule-copy-title">复制时段到</h3>
+          <div id="schedule-copy-days"></div>
+          <div class="dialog-actions">
+            <button id="schedule-copy-cancel" type="button" class="text-action" data-glass-action="plain">取消</button>
+            <button id="schedule-copy-apply" type="button" class="primary" data-glass-action="primary">应用</button>
+          </div>
+        </div>
         <div class="dialog-actions">
-          <button id="schedule-cancel" type="button" class="outline account-open">取消</button>
-          <button id="schedule-save" type="submit" class="primary">保存时段</button>
+          <button id="schedule-cancel" type="button" class="text-action" data-glass-action="plain">取消</button>
+          <button id="schedule-save" type="submit" class="primary" data-glass-action="primary">保存时段</button>
         </div>
       </form>
     </dialog>
-    <dialog id="account-dialog" aria-labelledby="account-dialog-title">
+    <dialog id="account-dialog" class="glass" data-glass-layer="22" aria-labelledby="account-dialog-title">
       <header class="dialog-header">
         <h2 id="account-dialog-title">账号管理</h2>
-        <button type="button" id="account-close" class="dialog-close" aria-label="关闭账号管理">×</button>
+        <button type="button" id="account-close" class="dialog-close" aria-label="关闭账号管理"><span class="ui-icon icon-close" aria-hidden="true"></span></button>
       </header>
       <div id="account-list-view">
         <p class="muted">优先使用主账号，需要时再用备用账号。</p>
         <ul id="account-list" class="account-list"></ul>
-        <button type="button" id="add-account" class="text-action">＋ 添加备用账号</button>
+        <button type="button" id="add-account" class="outline" data-glass-action>添加备用账号</button>
       </div>
       <form id="edit-account" autocomplete="off" novalidate hidden>
         <div id="edit-user-field">
@@ -141,21 +165,19 @@
         <label for="edit-password">密码</label>
         <input id="edit-password" type="password" maxlength="256" placeholder="请输入密码" autocomplete="new-password" required>
         <div class="dialog-actions">
-          <button type="button" class="outline account-open" id="edit-back">返回</button>
-          <button type="submit" class="primary">保存</button>
+          <button type="button" class="text-action account-open" id="edit-back" data-glass-action="plain">返回</button>
+          <button type="submit" class="primary" data-glass-action="primary">保存</button>
         </div>
       </form>
       <div id="remove-account" hidden>
         <p>删除后，守护器不会再尝试使用这个备用账号。</p>
         <div class="dialog-actions">
-          <button type="button" class="outline account-open" id="remove-back">返回</button>
-          <button type="button" class="primary" id="remove-confirm">删除</button>
+          <button type="button" class="text-action account-open" id="remove-back" data-glass-action="plain">返回</button>
+          <button type="button" class="primary danger" id="remove-confirm" data-glass-action="danger">删除</button>
         </div>
       </div>
       <p id="account-dialog-feedback" class="account-message" role="status" hidden></p>
     </dialog>
   </main>
-  <button id="reopen" class="reopen outline" type="button" hidden>打开校园网守护</button>
-  <footer class="demo-note">交互演示 · 不改变当前网络</footer>
 </body>
 </html>
